@@ -3,34 +3,32 @@
 # =============================================================================
 #
 # Triggers:
-#   • push a 'main'          → build + push con tag de versión + latest
-#   • workflow_dispatch      → ejecución manual (útil para forzar rebuild)
+#   • push a 'main' (solo si cambian archivos relevantes de la imagen)
+#   • workflow_dispatch → ejecución manual desde GitHub UI
 #
-# Secretos requeridos en GitHub → Settings → Secrets → Actions:
-#   DOCKERHUB_USERNAME   → tu usuario de Docker Hub (ej: molero)
-#   DOCKERHUB_TOKEN      → Access Token de Docker Hub (NO la contraseña)
-#                          Crear en: hub.docker.com → Account Settings → Security
+# Secretos requeridos (GitHub → Settings → Secrets → Actions):
+#   DOCKERHUB_USERNAME  → usuario de Docker Hub (ej: tesudacochino)
+#   DOCKERHUB_TOKEN     → Access Token (NO la contraseña)
+#                         Crear en: hub.docker.com → Account Settings → Security
 #
-# Estrategia de tags generados automáticamente:
-#   La versión de Moodle se lee del archivo MOODLE_VERSION en la raíz.
-#   Ejemplo: MOODLE_405_STABLE → genera los tags:
-#     molero/moodle:MOODLE_405_STABLE
-#     molero/moodle:4.5
-#     molero/moodle:latest
+# Tags generados automáticamente desde el archivo MOODLE_VERSION:
+#   MOODLE_405_STABLE  →  tesudacochino/moodle:MOODLE_405_STABLE
+#                         tesudacochino/moodle:4.5
+#                         tesudacochino/moodle:latest
+#                         tesudacochino/moodle:sha-<commit>
 #
-# Actualizar versión de Moodle:
-#   1. Editar el archivo MOODLE_VERSION
-#   2. Commit + push a main → CI construye y publica automáticamente
+# Para actualizar Moodle:
+#   1. Editar MOODLE_VERSION (ej: MOODLE_406_STABLE)
+#   2. git commit + push → CI construye y publica automáticamente
 # =============================================================================
 
-name: 🐳 Build & Publish to Docker Hub
+name: Docker Build and Publish
 
 on:
   push:
     branches:
       - main
     paths:
-      # Rebuild si cambia algo relevante para la imagen
       - 'Dockerfile'
       - 'MOODLE_VERSION'
       - 'scripts/**'
@@ -39,153 +37,115 @@ on:
   workflow_dispatch:
     inputs:
       force_rebuild:
-        description: 'Forzar rebuild aunque no haya cambios'
+        description: 'Forzar rebuild aunque no haya cambios relevantes'
         required: false
         default: 'false'
         type: boolean
 
-env:
-  # Nombre de la imagen en Docker Hub: usuario/moodle
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/moodle
-
 jobs:
   # ---------------------------------------------------------------------------
-  # Job: Build multi-arch y push a Docker Hub
+  # Job principal: build multi-arch y push a Docker Hub
   # ---------------------------------------------------------------------------
   build-and-push:
-    name: Build & Push (${{ matrix.platform }})
+    name: Build & Push to Docker Hub
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64   # Compatible con servidores ARM y Apple Silicon
 
     steps:
-      # ── 1. Checkout del repositorio ─────────────────────────────────────────
-      - name: 📥 Checkout
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # ── 2. Leer versión de Moodle desde el archivo MOODLE_VERSION ───────────
-      - name: 📋 Leer versión de Moodle
-        id: moodle_version
+      # ── 2. Leer versión desde MOODLE_VERSION ────────────────────────────────
+      - name: Read Moodle version
+        id: version
         run: |
-          # Leer la versión (quitar espacios y newlines)
           VERSION=$(cat MOODLE_VERSION | tr -d '[:space:]')
           echo "raw=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          # Convertir MOODLE_405_STABLE → 4.5  (para tag semántico)
-          # Extrae los dígitos del medio: MOODLE_405_STABLE → 405 → 4.05 → 4.5
-          DIGITS=$(echo "$VERSION" | grep -oP '(?<=MOODLE_)\d+(?=_STABLE)')
+          # Convertir MOODLE_405_STABLE → 4.5
+          DIGITS=$(echo "$VERSION" | grep -oP '(?<=MOODLE_)\d+(?=_STABLE)' || echo "")
           if [ -n "$DIGITS" ]; then
             MAJOR=$(echo "$DIGITS" | cut -c1)
-            MINOR_RAW=$(echo "$DIGITS" | cut -c2-)
-            # Eliminar ceros a la izquierda del minor (405 → 05 → 5)
-            MINOR=$(echo "$MINOR_RAW" | sed 's/^0*//')
+            MINOR=$(echo "$DIGITS" | cut -c2- | sed 's/^0*//')
+            [ -z "$MINOR" ] && MINOR="0"
             SEMVER="${MAJOR}.${MINOR}"
           else
             SEMVER="$VERSION"
           fi
 
           echo "semver=${SEMVER}" >> "$GITHUB_OUTPUT"
-          echo "✅ Versión Moodle: ${VERSION} → semver: ${SEMVER}"
+          echo "Moodle version: ${VERSION} → semver: ${SEMVER}"
 
-      # ── 3. Preparar nombre de plataforma (para cache key) ───────────────────
-      - name: 🏗️ Preparar plataforma
-        run: |
-          platform=${{ matrix.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
-
-      # ── 4. QEMU — soporte para builds multi-arquitectura ────────────────────
-      - name: 🔧 Setup QEMU
+      # ── 3. QEMU para builds multi-arquitectura ───────────────────────────────
+      - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
 
-      # ── 5. Docker Buildx ─────────────────────────────────────────────────────
-      - name: 🔧 Setup Docker Buildx
+      # ── 4. Docker Buildx ─────────────────────────────────────────────────────
+      - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── 6. Caché de capas Docker (GitHub Actions Cache) ──────────────────────
-      - name: 💾 Cache capas Docker
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ env.PLATFORM_PAIR }}-${{ hashFiles('Dockerfile', 'MOODLE_VERSION', 'scripts/**', 'config/**') }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-${{ env.PLATFORM_PAIR }}-
-            ${{ runner.os }}-buildx-
-
-      # ── 7. Login en Docker Hub ───────────────────────────────────────────────
-      - name: 🔐 Login Docker Hub
+      # ── 5. Login en Docker Hub ───────────────────────────────────────────────
+      #    NOTA: secrets solo son accesibles dentro de steps (no en env: global)
+      - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ── 8. Generar metadata y tags ───────────────────────────────────────────
-      - name: 🏷️ Generar tags y metadata
+      # ── 6. Generar tags y labels ─────────────────────────────────────────────
+      - name: Generate image metadata and tags
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/moodle
           tags: |
-            # Tag con nombre de rama Moodle: molero/moodle:MOODLE_405_STABLE
-            type=raw,value=${{ steps.moodle_version.outputs.raw }}
-            # Tag semántico: molero/moodle:4.5
-            type=raw,value=${{ steps.moodle_version.outputs.semver }}
-            # Tag latest (siempre apunta al build más reciente de main)
+            type=raw,value=${{ steps.version.outputs.raw }}
+            type=raw,value=${{ steps.version.outputs.semver }}
             type=raw,value=latest
-            # Tag con SHA corto del commit: molero/moodle:sha-abc1234
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
-            org.opencontainers.image.description=Moodle ${{ steps.moodle_version.outputs.semver }} con PHP 8.4 + Apache + PostgreSQL + Redis
+            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.4 + Apache + PostgreSQL + Redis
             org.opencontainers.image.vendor=${{ secrets.DOCKERHUB_USERNAME }}
-            moodle.version=${{ steps.moodle_version.outputs.raw }}
+            moodle.version=${{ steps.version.outputs.raw }}
 
-      # ── 9. Build y Push ──────────────────────────────────────────────────────
-      - name: 🐳 Build y Push imagen
+      # ── 7. Build multi-arch y Push ───────────────────────────────────────────
+      #    Una sola build para amd64 + arm64 → crea un manifest multi-plataforma
+      - name: Build Docker image, Tag and Push to Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            MOODLE_VERSION=${{ steps.moodle_version.outputs.raw }}
+            MOODLE_VERSION=${{ steps.version.outputs.raw }}
             PHP_VERSION=8.4
-          # Caché para acelerar builds consecutivos
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to:   type=local,dest=/tmp/.buildx-cache-new,mode=max
-          # Provenance y SBOM para seguridad
+          # Caché nativa de GitHub Actions (más simple y fiable que local)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           provenance: true
           sbom: true
 
-      # ── Rotación de caché (evita que crezca indefinidamente) ─────────────────
-      - name: 🔄 Rotar caché
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
   # ---------------------------------------------------------------------------
-  # Job: Actualizar descripción en Docker Hub (tras build exitoso)
+  # Job secundario: sincronizar README como descripción en Docker Hub
   # ---------------------------------------------------------------------------
   update-dockerhub-description:
-    name: 📝 Actualizar descripción en Docker Hub
+    name: Update Docker Hub description
     runs-on: ubuntu-latest
     needs: build-and-push
     if: success()
     steps:
-      - name: 📥 Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: 📝 Actualizar descripción en Docker Hub
+      - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v4
         with:
-          username:   ${{ secrets.DOCKERHUB_USERNAME }}
-          password:   ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/moodle
           readme-filepath: ./README.md
-          short-description: "Moodle LMS con PHP 8.4, Apache, PostgreSQL y Redis — imagen mantenible y actualizable"
+          short-description: "Moodle LMS con PHP 8.4, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"
