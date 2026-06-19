@@ -1,0 +1,24 @@
+# Entorno
+.env
+
+# Datos de Moodle (nunca en git — solo en volúmenes Docker)
+data/
+
+# Backups
+backups/
+
+# Logs locales
+*.log
+
+# Docker override local
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo

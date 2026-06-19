@@ -1,0 +1,160 @@
+# =============================================================================
+# Docker Compose — Stack completo de Moodle
+# =============================================================================
+# Servicios:
+#   moodle  → Aplicación PHP + Apache
+#   db      → PostgreSQL 17
+#   redis   → Cache store (MUC)
+#
+# Uso rápido:
+#   cp .env.example .env   → Editar variables
+#   make up                → Levantar stack
+#   make logs              → Ver logs
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Moodle (PHP + Apache)
+  # ---------------------------------------------------------------------------
+  moodle:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # La versión se lee del .env → fácil de cambiar para upgrades
+        MOODLE_VERSION: ${MOODLE_VERSION:-MOODLE_405_STABLE}
+        PHP_VERSION: ${PHP_VERSION:-8.4}
+    image: moodle-custom:${MOODLE_VERSION:-MOODLE_405_STABLE}
+    container_name: moodle_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    environment:
+      # Moodle core
+      MOODLE_WWWROOT:       ${MOODLE_WWWROOT:-http://localhost:8080}
+      MOODLE_DATAROOT:      /var/www/moodledata
+      MOODLE_ADMIN_USER:    ${MOODLE_ADMIN_USER:-admin}
+      MOODLE_ADMIN_PASS:    ${MOODLE_ADMIN_PASS:-Admin1234!}
+      MOODLE_ADMIN_EMAIL:   ${MOODLE_ADMIN_EMAIL:-admin@example.com}
+      MOODLE_SITE_NAME:     ${MOODLE_SITE_NAME:-My Moodle Site}
+      MOODLE_LANG:          ${MOODLE_LANG:-es}
+      # Reverse proxy SSL — poner 'true' cuando Nginx del host termina SSL
+      # Oblig. para que Moodle genere URLs https:// correctas
+      MOODLE_SSLPROXY:      ${MOODLE_SSLPROXY:-false}
+      # Base de datos
+      DB_TYPE:    pgsql
+      DB_HOST:    db
+      DB_PORT:    5432
+      DB_NAME:    ${DB_NAME:-moodle}
+      DB_USER:    ${DB_USER:-moodle}
+      DB_PASS:    ${DB_PASS:-moodle}
+      DB_PREFIX:  ${DB_PREFIX:-mdl_}
+      # Redis cache
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      # moodledata SIEMPRE en volumen — nunca borrar este volumen
+      - moodledata:/var/www/moodledata
+      # Plugins personalizados (montar sobre el directorio de plugins)
+      # Descomenta si tienes plugins locales:
+      # - ./local_plugins:/var/www/html/local
+    networks:
+      - moodle_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/login/index.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 17 — Base de datos principal
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:17-alpine
+    container_name: moodle_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-moodle}
+      POSTGRES_USER:     ${DB_USER:-moodle}
+      POSTGRES_PASSWORD: ${DB_PASS:-moodle}
+      # Performance tuning básico para Moodle
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - moodle_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-moodle} -d ${DB_NAME:-moodle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — Cache Store (MUC) para sesiones y caché de Moodle
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: moodle_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    volumes:
+      - redis_data:/data
+    networks:
+      - moodle_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "2"
+
+# =============================================================================
+# Volúmenes persistentes — NUNCA eliminar manualmente en producción
+# =============================================================================
+volumes:
+  moodledata:
+    driver: local
+    labels:
+      moodle.component: "userdata"
+      moodle.backup: "required"
+  db_data:
+    driver: local
+    labels:
+      moodle.component: "database"
+      moodle.backup: "required"
+  redis_data:
+    driver: local
+    labels:
+      moodle.component: "cache"
+      moodle.backup: "optional"
+
+# =============================================================================
+# Red interna
+# =============================================================================
+networks:
+  moodle_net:
+    driver: bridge
+    name: moodle_network

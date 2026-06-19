@@ -1,0 +1,25 @@
+# =============================================================================
+# plugins.txt — Lista de plugins de terceros para instalar en Moodle
+# =============================================================================
+# Formato: <tipo/nombre>  <url_repositorio_git>  [rama_o_tag]
+#
+# La rama/tag es OPCIONAL. Si no se especifica, usa 'main'.
+# Usa ramas compatibles con tu versión de Moodle (ej: MOODLE_405_STABLE)
+#
+# Para instalar: make install-plugins
+# =============================================================================
+
+# Ejemplos (descomenta y ajusta los que necesites):
+
+# ─── Actividades ──────────────────────────────────────────────────────────────
+# mod/attendance    https://github.com/danmarsden/moodle-mod_attendance   MOODLE_405_STABLE
+# mod/checklist     https://github.com/davosmith/moodle-checklist          MOODLE_405_STABLE
+
+# ─── Temas ────────────────────────────────────────────────────────────────────
+# theme/moove       https://github.com/willianmano/moodle-theme-moove      MOODLE_405_STABLE
+
+# ─── Bloques ──────────────────────────────────────────────────────────────────
+# block/dedication  https://github.com/davidherney/moodle-block-dedication  main
+
+# ─── Autenticación ────────────────────────────────────────────────────────────
+# auth/saml2        https://github.com/catalyst/moodle-auth_saml2          MOODLE_405_STABLE

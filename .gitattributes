@@ -1,0 +1,16 @@
+# Forzar LF en scripts de shell y Makefile (se ejecutan en Linux dentro de Docker)
+*.sh text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+scripts/** text eol=lf
+
+# El resto con CRLF en Windows / LF en Linux (comportamiento por defecto)
+*.yml text eol=lf
+*.yaml text eol=lf
+*.conf text eol=lf
+*.ini text eol=lf
+*.sql text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.env* text eol=lf
+MOODLE_VERSION text eol=lf
