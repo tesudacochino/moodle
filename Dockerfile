@@ -46,16 +46,23 @@ ENV MOODLE_WWWROOT=http://localhost:8080 \
     DB_PASS=moodle \
     DB_PREFIX=mdl_ \
     REDIS_HOST=redis \
-    REDIS_PORT=6379 \
-    # Guarda la versión instalada como env var para introspección
-    MOODLE_VERSION_LABEL=${MOODLE_VERSION}
+    REDIS_PORT=6379
+
+# Guarda la versión instalada como env var para introspección en runtime
+ENV MOODLE_VERSION_LABEL=${MOODLE_VERSION}
 
 # ---------------------------------------------------------------------------
 # Clonar Moodle desde GitHub (shallow clone para reducir tamaño)
 # ---------------------------------------------------------------------------
+# WORKDIR / es crítico: la imagen base tiene WORKDIR=/var/www/html.
+# Si hacemos rm -rf /var/www/html con ese WORKDIR activo, el shell
+# pierde su CWD y git falla con "Unable to read current working directory".
+WORKDIR /
+
 RUN set -eux; \
-    # Limpiar el directorio destino (base image puede tener archivos)
+    # Limpiar el directorio destino (la imagen base puede tener archivos)
     rm -rf /var/www/html; \
+    mkdir -p /var/www/html; \
     # Clonar rama específica, sin historial completo (más rápido, menos espacio)
     git clone \
         --depth 1 \
