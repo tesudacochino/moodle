@@ -1,0 +1,156 @@
+# =============================================================================
+# Docker Compose — DESPLIEGUE en producción/staging
+# =============================================================================
+# Usa la imagen publicada en Docker Hub (NO hace build local).
+#
+# Diferencias con docker-compose.yml (desarrollo):
+#   - Sin bloque build: — descarga la imagen desde Docker Hub
+#   - La imagen se controla con MOODLE_IMAGE_TAG en .env
+#   - restart: always  (más agresivo que unless-stopped)
+#   - Sin bind-mounts de código fuente
+#
+# Uso:
+#   cp .env.example .env          → configurar variables
+#   docker compose -f docker-compose.deploy.yml pull   → descargar imagen
+#   docker compose -f docker-compose.deploy.yml up -d  → arrancar
+#
+# O con el Makefile:
+#   make deploy-up
+#   make deploy-pull
+#   make deploy-logs
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Moodle — imagen publicada en Docker Hub
+  # ---------------------------------------------------------------------------
+  moodle:
+    # Imagen desde Docker Hub — cambia MOODLE_IMAGE_TAG en .env para pinear versión
+    # Ejemplos:
+    #   tesudacochino/moodle:latest              → siempre el más reciente
+    #   tesudacochino/moodle:4.5                 → Moodle 4.5.x
+    #   tesudacochino/moodle:MOODLE_405_STABLE   → rama exacta
+    image: ${DOCKERHUB_USERNAME:-tesudacochino}/moodle:${MOODLE_IMAGE_TAG:-latest}
+    container_name: moodle_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    environment:
+      MOODLE_WWWROOT:    ${MOODLE_WWWROOT:-http://localhost:8080}
+      MOODLE_DATAROOT:   /var/www/moodledata
+      MOODLE_ADMIN_USER: ${MOODLE_ADMIN_USER:-admin}
+      MOODLE_ADMIN_PASS: "${MOODLE_ADMIN_PASS:-Admin1234!}"
+      MOODLE_ADMIN_EMAIL: "${MOODLE_ADMIN_EMAIL:-admin@example.com}"
+      MOODLE_SITE_NAME:  ${MOODLE_SITE_NAME:-My Moodle Site}
+      MOODLE_LANG:       ${MOODLE_LANG:-es}
+      MOODLE_SSLPROXY:   ${MOODLE_SSLPROXY:-false}
+      DB_TYPE:    pgsql
+      DB_HOST:    db
+      DB_PORT:    5432
+      DB_NAME:    ${DB_NAME:-moodle}
+      DB_USER:    ${DB_USER:-moodle}
+      DB_PASS:    "${DB_PASS:-moodle_change_me}"
+      DB_PREFIX:  ${DB_PREFIX:-mdl_}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - moodledata:/var/www/moodledata
+    networks:
+      - moodle_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/login/index.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 17
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:17-alpine
+    container_name: moodle_db
+    restart: always
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-moodle}
+      POSTGRES_USER:     ${DB_USER:-moodle}
+      POSTGRES_PASSWORD: "${DB_PASS:-moodle_change_me}"
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - moodle_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-moodle} -d ${DB_NAME:-moodle}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — Cache store y sesiones
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: moodle_redis
+    restart: always
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    volumes:
+      - redis_data:/data
+    networks:
+      - moodle_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "2"
+
+# =============================================================================
+# Volúmenes persistentes
+# =============================================================================
+volumes:
+  moodledata:
+    driver: local
+    labels:
+      moodle.component: "userdata"
+      moodle.backup: "required"
+  db_data:
+    driver: local
+    labels:
+      moodle.component: "database"
+      moodle.backup: "required"
+  redis_data:
+    driver: local
+    labels:
+      moodle.component: "cache"
+      moodle.backup: "optional"
+
+# =============================================================================
+# Red interna
+# =============================================================================
+networks:
+  moodle_net:
+    driver: bridge
+    name: moodle_network

@@ -17,12 +17,15 @@ endif
 MOODLE_VERSION    ?= $(shell cat MOODLE_VERSION 2>/dev/null | tr -d '[:space:]' || echo "MOODLE_405_STABLE")
 
 COMPOSE           := docker compose
+DEPLOY_COMPOSE    := docker compose -f docker-compose.deploy.yml
 CONTAINER_MOODLE  := moodle_app
 BACKUP_DIR        := ./backups
 TIMESTAMP         := $(shell date +%Y%m%d_%H%M%S)
 
 .PHONY: help up down restart build rebuild shell logs status \
-        backup restore upgrade purge db-shell info check-env
+        backup restore upgrade purge db-shell info check-env \
+        deploy-pull deploy-up deploy-down deploy-restart \
+        deploy-logs deploy-status deploy-upgrade deploy-backup deploy-shell
 
 # ─── Ayuda ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +164,61 @@ check-env: ## Verifica que existe el archivo .env
 		echo ""; \
 		exit 1; \
 	fi
+
+# ─── Despliegue desde Docker Hub (docker-compose.deploy.yml) ──────────────────
+
+deploy-pull: check-env ## Descarga la imagen desde Docker Hub
+	@echo ""
+	@echo "  ⤵️   Descargando imagen: $(DOCKERHUB_USERNAME:-tesudacochino)/moodle:$(MOODLE_IMAGE_TAG:-latest)"
+	$(DEPLOY_COMPOSE) pull moodle
+	@echo "  ✅  Imagen descargada."
+	@echo ""
+
+deploy-up: check-env ## Levanta el stack de PRODUCCIÓN desde Docker Hub
+	$(DEPLOY_COMPOSE) pull moodle
+	$(DEPLOY_COMPOSE) up -d
+	@echo ""
+	@echo "  ✅  Stack de producción en marcha."
+	@echo "  📋  Logs: make deploy-logs"
+	@echo ""
+
+deploy-down: ## Para el stack de producción (conserva volúmenes)
+	$(DEPLOY_COMPOSE) down
+
+deploy-restart: ## Reinicia el stack de producción
+	$(DEPLOY_COMPOSE) restart
+
+deploy-status: ## Estado del stack de producción
+	@echo ""
+	$(DEPLOY_COMPOSE) ps
+	@echo ""
+
+deploy-logs: ## Logs en tiempo real del stack de producción
+	$(DEPLOY_COMPOSE) logs -f --tail=100
+
+deploy-shell: ## Shell bash en el contenedor Moodle (producción)
+	$(DEPLOY_COMPOSE) exec moodle bash
+
+deploy-upgrade: ## Ejecuta upgrade de Moodle en el stack de producción
+	@echo "  🚀  Ejecutando upgrade en producción..."
+	$(DEPLOY_COMPOSE) exec moodle php /var/www/html/admin/cli/upgrade.php --non-interactive
+	@echo "  ✅  Upgrade completado."
+
+deploy-backup: ## Backup de BD + moodledata en el stack de producción
+	@mkdir -p $(BACKUP_DIR)
+	@echo ""
+	@echo "  📦  Backup producción: $(TIMESTAMP)"
+	$(DEPLOY_COMPOSE) exec -T db pg_dump \
+		-U $(DB_USER) \
+		-d $(DB_NAME) \
+		--no-password \
+		| gzip > $(BACKUP_DIR)/db_deploy_$(TIMESTAMP).sql.gz
+	@echo "  └─ BD: $(BACKUP_DIR)/db_deploy_$(TIMESTAMP).sql.gz"
+	$(DEPLOY_COMPOSE) exec moodle tar -czf - -C /var/www moodledata \
+		> $(BACKUP_DIR)/moodledata_deploy_$(TIMESTAMP).tar.gz
+	@echo "  └─ Data: $(BACKUP_DIR)/moodledata_deploy_$(TIMESTAMP).tar.gz"
+	@echo "  ✅  Backup completado."
+	@echo ""
 
 # ─── Destrucción (peligroso) ──────────────────────────────────────────────────
 
