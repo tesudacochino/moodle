@@ -24,7 +24,7 @@ services:
       args:
         # La versión se lee del .env → fácil de cambiar para upgrades
         MOODLE_VERSION: ${MOODLE_VERSION:-MOODLE_405_STABLE}
-        PHP_VERSION: ${PHP_VERSION:-8.4}
+        PHP_VERSION: ${PHP_VERSION:-8.1}
     image: moodle-custom:${MOODLE_VERSION:-MOODLE_405_STABLE}
     container_name: moodle_app
     restart: unless-stopped
