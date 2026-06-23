@@ -15,15 +15,23 @@
 # =============================================================================
 set -euo pipefail
 
-PLUGINS_FILE="/tmp/plugins.txt"
-WWWROOT="/var/www/html"
+# Buscar plugins.txt en ubicaciones conocidas
+PLUGINS_FILE=""
+for candidate in "/usr/local/etc/plugins.txt" "/tmp/plugins.txt" "/var/www/html/plugins.txt"; do
+    if [ -f "$candidate" ]; then
+        PLUGINS_FILE="$candidate"
+        break
+    fi
+done
 
-if [ ! -f "${PLUGINS_FILE}" ]; then
-    echo "No se encontró plugins.txt. Nada que instalar."
+if [ -z "${PLUGINS_FILE}" ]; then
+    echo "No se encontró plugins.txt en ninguna ubicación conocida. Nada que instalar."
     exit 0
 fi
 
-echo "Instalando plugins desde plugins.txt..."
+WWWROOT="/var/www/html"
+
+echo "Instalando plugins desde ${PLUGINS_FILE}..."
 
 while IFS= read -r line; do
     # Ignorar comentarios y líneas vacías

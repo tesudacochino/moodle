@@ -31,22 +31,22 @@ LABEL moodle.version="${MOODLE_VERSION}"
 # ---------------------------------------------------------------------------
 # Variables de entorno de runtime (pueden sobreescribirse con -e o en compose)
 # ---------------------------------------------------------------------------
+# Valores funcionales que no son secretos — los secretos DEBEN venir del .env
 ENV MOODLE_WWWROOT=http://localhost:8080 \
     MOODLE_DATAROOT=/var/www/moodledata \
     MOODLE_ADMIN_USER=admin \
-    MOODLE_ADMIN_PASS=Admin1234! \
-    MOODLE_ADMIN_EMAIL=admin@example.com \
     MOODLE_SITE_NAME="My Moodle Site" \
     MOODLE_LANG=es \
+    MOODLE_SSLPROXY=false \
     DB_TYPE=pgsql \
     DB_HOST=db \
     DB_PORT=5432 \
     DB_NAME=moodle \
-    DB_USER=moodle \
-    DB_PASS=moodle \
     DB_PREFIX=mdl_ \
     REDIS_HOST=redis \
     REDIS_PORT=6379
+# Nota: MOODLE_ADMIN_PASS, MOODLE_ADMIN_EMAIL, DB_USER y DB_PASS
+# NO tienen default — DEBEN definirse en .env o docker-compose
 
 # Guarda la versión instalada como env var para introspección en runtime
 ENV MOODLE_VERSION_LABEL=${MOODLE_VERSION}
@@ -81,7 +81,7 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 RUN mkdir -p /var/www/moodledata \
     && chown -R www-data:www-data /var/www/moodledata \
-    && chmod 777 /var/www/moodledata
+    && chmod 0770 /var/www/moodledata
 
 # ---------------------------------------------------------------------------
 # Configuración PHP personalizada
@@ -103,28 +103,28 @@ COPY scripts/entrypoint.sh /usr/local/bin/moodle-entrypoint.sh
 RUN chmod +x /usr/local/bin/moodle-entrypoint.sh
 
 # ---------------------------------------------------------------------------
-# Extensiones PHP — asegurar pdo_pgsql (puede no estar activa en la base)
+# Extensiones PHP + dependencias del sistema (una sola capa de apt-get)
 # ---------------------------------------------------------------------------
-# La imagen base incluye las extensiones de Moodle, pero pdo_pgsql puede
-# no estar compilada/activa. La instalamos explícitamente para garantizarlo.
+# pdo_pgsql: puede no estar activa en la imagen base, la instalamos explícitamente
+# cron: para tareas programadas de Moodle (cada minuto)
+# gettext-base: utilidades de localización
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq-dev \
-    && docker-php-ext-install pdo_pgsql pgsql \
-    && rm -rf /var/lib/apt/lists/*
-
-# Instalar dependencias adicionales útiles
-RUN apt-get update && apt-get install -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+        libpq-dev \
         cron \
         gettext-base \
+    && docker-php-ext-install pdo_pgsql pgsql \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
 # Cron para tareas programadas de Moodle
 # ---------------------------------------------------------------------------
-RUN echo "* * * * * www-data /usr/local/bin/php /var/www/html/admin/cli/cron.php >> /var/log/moodle-cron.log 2>&1" \
+# Formato /etc/cron.d: minuto hora dia mes diasemana USUARIO comando
+# IMPORTANTE: el trailing newline es OBLIGATORIO para que cron lo procese.
+# NO usar 'crontab' con este archivo — crontab no acepta el campo de usuario.
+RUN printf '* * * * * www-data /usr/local/bin/php /var/www/html/admin/cli/cron.php >> /var/log/moodle-cron.log 2>&1\n' \
     > /etc/cron.d/moodle-cron \
-    && chmod 0644 /etc/cron.d/moodle-cron \
-    && crontab /etc/cron.d/moodle-cron
+    && chmod 0644 /etc/cron.d/moodle-cron
 
 EXPOSE 80
 

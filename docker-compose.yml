@@ -67,7 +67,7 @@ services:
     networks:
       - moodle_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/login/index.php"]
+      test: ["CMD", "php", "-r", "file_get_contents('http://localhost/login/index.php') === false ? exit(1) : exit(0);"]
       interval: 30s
       timeout: 10s
       retries: 5

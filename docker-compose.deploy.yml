@@ -66,7 +66,7 @@ services:
         aliases:
           - moodle
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/login/index.php"]
+      test: ["CMD", "php", "-r", "file_get_contents('http://localhost/login/index.php') === false ? exit(1) : exit(0);"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -91,7 +91,9 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # init.sql es opcional — solo necesario si quieres extensiones pg_trgm/unaccent
+      # Descomenta y copia config/postgres/init.sql al servidor si lo necesitas:
+      # - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       moodle_net:
         aliases:

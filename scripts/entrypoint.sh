@@ -96,71 +96,74 @@ wait_for_db() {
 generate_config() {
     log "Generando config.php..."
 
-    cat > "${CONFIG_FILE}" << EOF
+    cat > "${CONFIG_FILE}" << 'CONFIGEOF'
 <?php  // Moodle configuration file — generado automáticamente al arrancar el contenedor
        // Para modificar, edita las variables de entorno en docker-compose.yml o .env
+       //
+       // IMPORTANTE: Este fichero usa getenv() para credenciales y valores que
+       // pueden contener caracteres especiales ($, ', \). Nunca hardcodear passwords.
 
-unset(\$CFG);
-global \$CFG;
-\$CFG = new stdClass();
+unset($CFG);
+global $CFG;
+$CFG = new stdClass();
 
 // ─── Base de datos ────────────────────────────────────────────────────────────
-\$CFG->dbtype    = '${DB_TYPE}';
-\$CFG->dblibrary = 'native';
-\$CFG->dbhost    = '${DB_HOST}';
-\$CFG->dbport    = ${DB_PORT};
-\$CFG->dbname    = '${DB_NAME}';
-\$CFG->dbuser    = '${DB_USER}';
-\$CFG->dbpass    = '${DB_PASS}';
-\$CFG->prefix    = '${DB_PREFIX}';
-\$CFG->dboptions = array(
+$CFG->dbtype    = getenv('DB_TYPE') ?: 'pgsql';
+$CFG->dblibrary = 'native';
+$CFG->dbhost    = getenv('DB_HOST') ?: 'db';
+$CFG->dbport    = getenv('DB_PORT') ?: 5432;
+$CFG->dbname    = getenv('DB_NAME') ?: 'moodle';
+$CFG->dbuser    = getenv('DB_USER') ?: 'moodle';
+$CFG->dbpass    = getenv('DB_PASS') ?: 'moodle';
+$CFG->prefix    = getenv('DB_PREFIX') ?: 'mdl_';
+$CFG->dboptions = array(
     'dbpersist' => 0,
     'dbsocket'  => '',
 );
 
 // ─── Rutas ────────────────────────────────────────────────────────────────────
-\$CFG->wwwroot   = '${MOODLE_WWWROOT}';
-\$CFG->dataroot  = '${MOODLE_DATAROOT}';
-\$CFG->admin     = 'admin';
+$CFG->wwwroot   = getenv('MOODLE_WWWROOT') ?: 'http://localhost:8080';
+$CFG->dataroot  = getenv('MOODLE_DATAROOT') ?: '/var/www/moodledata';
+$CFG->admin     = 'admin';
 
 // ─── Reverse proxy / SSL ──────────────────────────────────────────────────────
-// IMPORTANTE: Activar cuando Moodle está detrás de un Nginx/proxy que termina SSL.
+// Activar cuando Moodle está detrás de un Nginx/proxy que termina SSL.
 // Sin esto, Moodle genera URLs http:// aunque el usuario acceda por https://
-\$CFG->reverseproxy = ${MOODLE_SSLPROXY} === 'true' ? true : false;
-\$CFG->sslproxy     = ${MOODLE_SSLPROXY} === 'true' ? true : false;
+$CFG->sslproxy = (getenv('MOODLE_SSLPROXY') === 'true');
 
 // ─── Seguridad ────────────────────────────────────────────────────────────────
-\$CFG->directorypermissions = 02777;
+$CFG->directorypermissions = 02777;
 
 // ─── Cache (Redis MUC) ────────────────────────────────────────────────────────
-// Habilitado si REDIS_HOST está definido
-if (!empty('${REDIS_HOST}')) {
-    \$CFG->session_handler_class = '\core\session\redis';
-    \$CFG->session_redis_host    = '${REDIS_HOST}';
-    \$CFG->session_redis_port    = ${REDIS_PORT};
-    \$CFG->session_redis_database = 0;
-    \$CFG->session_redis_auth    = '';
-    \$CFG->session_redis_prefix  = 'moodle_session_';
-    \$CFG->session_redis_acquire_lock_timeout = 120;
-    \$CFG->session_redis_lock_expire          = 7200;
+$redis_host = getenv('REDIS_HOST');
+if (!empty($redis_host)) {
+    $CFG->session_handler_class = '\core\session\redis';
+    $CFG->session_redis_host    = $redis_host;
+    $CFG->session_redis_port    = (int)(getenv('REDIS_PORT') ?: 6379);
+    $CFG->session_redis_database = 0;
+    $CFG->session_redis_auth    = '';
+    $CFG->session_redis_prefix  = 'moodle_session_';
+    $CFG->session_redis_acquire_lock_timeout = 120;
+    $CFG->session_redis_lock_expire          = 7200;
 }
 
 // ─── Rendimiento ─────────────────────────────────────────────────────────────
-\$CFG->pathtophp    = '/usr/local/bin/php';
-\$CFG->pathtodu     = '/usr/bin/du';
-\$CFG->aspellpath   = '/usr/bin/aspell';
+$CFG->pathtophp    = '/usr/local/bin/php';
+$CFG->pathtodu     = '/usr/bin/du';
+$CFG->aspellpath   = '/usr/bin/aspell';
 
 // ─── Debug (desactivar en producción) ────────────────────────────────────────
-// \$CFG->debug        = E_ALL;
-// \$CFG->debugdisplay = 1;
+// $CFG->debug        = E_ALL;
+// $CFG->debugdisplay = 1;
 
 require_once(__DIR__ . '/lib/setup.php');
-EOF
+CONFIGEOF
 
     chown www-data:www-data "${CONFIG_FILE}"
     chmod 640 "${CONFIG_FILE}"
     log_ok "config.php generado."
 }
+
 
 # =============================================================================
 # 3. Instalar o actualizar Moodle

@@ -37,7 +37,7 @@ fi
 
 # ─── Versión nueva ─────────────────────────────────────────────────────────────
 NEW_VERSION="${1:-}"
-CURRENT_VERSION=$(grep '^MOODLE_VERSION=' .env | cut -d= -f2)
+CURRENT_VERSION=$(cat MOODLE_VERSION 2>/dev/null | tr -d '[:space:]')
 
 if [ -z "${NEW_VERSION}" ]; then
     echo ""
@@ -81,14 +81,9 @@ make backup
 log_ok "Backup completado."
 
 # ─── 2. Actualizar .env ───────────────────────────────────────────────────────
-log "Paso 2/4: Actualizando MOODLE_VERSION en .env..."
-# Compatible con macOS y Linux
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/^MOODLE_VERSION=.*/MOODLE_VERSION=${NEW_VERSION}/" .env
-else
-    sed -i "s/^MOODLE_VERSION=.*/MOODLE_VERSION=${NEW_VERSION}/" .env
-fi
-log_ok ".env actualizado → MOODLE_VERSION=${NEW_VERSION}"
+log "Paso 2/4: Actualizando MOODLE_VERSION..."
+echo "${NEW_VERSION}" > MOODLE_VERSION
+log_ok "MOODLE_VERSION actualizado → ${NEW_VERSION}"
 
 # ─── 3. Rebuild de la imagen ──────────────────────────────────────────────────
 log "Paso 3/4: Rebuilding imagen Docker (esto puede tardar unos minutos)..."
