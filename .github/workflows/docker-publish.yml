@@ -122,7 +122,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MOODLE_VERSION=${{ steps.version.outputs.raw }}
-            PHP_VERSION=8.4
+            PHP_VERSION=8.1
           # Caché nativa de GitHub Actions (más simple y fiable que local)
           cache-from: type=gha
           cache-to: type=gha,mode=max

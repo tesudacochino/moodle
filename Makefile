@@ -169,7 +169,7 @@ check-env: ## Verifica que existe el archivo .env
 
 deploy-pull: check-env ## Descarga la imagen desde Docker Hub
 	@echo ""
-	@echo "  ⤵️   Descargando imagen: $(DOCKERHUB_USERNAME:-tesudacochino)/moodle:$(MOODLE_IMAGE_TAG:-latest)"
+	@echo "  ⤵️   Descargando imagen: $(DOCKERHUB_USERNAME:-molero)/moodle:$(MOODLE_IMAGE_TAG:-latest)"
 	$(DEPLOY_COMPOSE) pull moodle
 	@echo "  ✅  Imagen descargada."
 	@echo ""
