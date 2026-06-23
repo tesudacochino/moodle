@@ -61,29 +61,34 @@ wait_for_db() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
+        # getenv() evita problemas de escape con passwords con caracteres especiales
+        # Los errores van a stderr → visibles en 'docker compose logs'
         if php -r "
             try {
-                \$pdo = new PDO(
-                    '${DB_TYPE}:host=${DB_HOST};port=${DB_PORT};dbname=${DB_NAME}',
-                    '${DB_USER}',
-                    '${DB_PASS}'
-                );
+                \$dsn = getenv('DB_TYPE') . ':host=' . getenv('DB_HOST')
+                     . ';port=' . getenv('DB_PORT')
+                     . ';dbname=' . getenv('DB_NAME');
+                \$pdo = new PDO(\$dsn, getenv('DB_USER'), getenv('DB_PASS'));
                 exit(0);
             } catch (Exception \$e) {
+                fwrite(STDERR, '[DB] ' . \$e->getMessage() . PHP_EOL);
                 exit(1);
             }
-        " 2>/dev/null; then
+        " 2>&1; then
             log_ok "Base de datos disponible."
             return 0
         fi
+
         attempt=$((attempt + 1))
         log_warn "BD no disponible aún, intento ${attempt}/${max_attempts}..."
         sleep 3
     done
 
     log_err "No se pudo conectar a la base de datos después de ${max_attempts} intentos."
+    log_err "  Comprueba: DB_HOST=${DB_HOST} DB_PORT=${DB_PORT} DB_NAME=${DB_NAME} DB_USER=${DB_USER}"
     exit 1
 }
+
 
 # =============================================================================
 # 2. Generar config.php desde variables de entorno
@@ -162,14 +167,16 @@ EOF
 # =============================================================================
 install_or_upgrade() {
     # Verificar si Moodle ya tiene tablas instaladas
+    # Usar getenv() para evitar problemas de escape con caracteres especiales
     local is_installed
     is_installed=$(php -r "
         try {
-            \$pdo = new PDO(
-                '${DB_TYPE}:host=${DB_HOST};port=${DB_PORT};dbname=${DB_NAME}',
-                '${DB_USER}', '${DB_PASS}'
-            );
-            \$stmt = \$pdo->query(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '${DB_PREFIX}config'\");
+            \$dsn  = getenv('DB_TYPE') . ':host=' . getenv('DB_HOST')
+                  . ';port=' . getenv('DB_PORT')
+                  . ';dbname=' . getenv('DB_NAME');
+            \$pdo  = new PDO(\$dsn, getenv('DB_USER'), getenv('DB_PASS'));
+            \$prefix = getenv('DB_PREFIX');
+            \$stmt = \$pdo->query(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{$prefix}config'\");
             echo \$stmt->fetchColumn() > 0 ? 'yes' : 'no';
         } catch (Exception \$e) {
             echo 'no';
