@@ -102,6 +102,16 @@ RUN a2dissite 000-default.conf 2>/dev/null || true; \
 COPY scripts/entrypoint.sh /usr/local/bin/moodle-entrypoint.sh
 RUN chmod +x /usr/local/bin/moodle-entrypoint.sh
 
+# ---------------------------------------------------------------------------
+# Extensiones PHP — asegurar pdo_pgsql (puede no estar activa en la base)
+# ---------------------------------------------------------------------------
+# La imagen base incluye las extensiones de Moodle, pero pdo_pgsql puede
+# no estar compilada/activa. La instalamos explícitamente para garantizarlo.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq-dev \
+    && docker-php-ext-install pdo_pgsql pgsql \
+    && rm -rf /var/lib/apt/lists/*
+
 # Instalar dependencias adicionales útiles
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cron \
