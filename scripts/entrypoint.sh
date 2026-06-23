@@ -171,12 +171,13 @@ install_or_upgrade() {
     local is_installed
     is_installed=$(php -r "
         try {
-            \$dsn  = getenv('DB_TYPE') . ':host=' . getenv('DB_HOST')
-                  . ';port=' . getenv('DB_PORT')
-                  . ';dbname=' . getenv('DB_NAME');
-            \$pdo  = new PDO(\$dsn, getenv('DB_USER'), getenv('DB_PASS'));
-            \$prefix = getenv('DB_PREFIX');
-            \$stmt = \$pdo->query(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{$prefix}config'\");
+            \$dsn = getenv('DB_TYPE') . ':host=' . getenv('DB_HOST')
+                 . ';port=' . getenv('DB_PORT')
+                 . ';dbname=' . getenv('DB_NAME');
+            \$pdo = new PDO(\$dsn, getenv('DB_USER'), getenv('DB_PASS'));
+            \$tbl = getenv('DB_PREFIX') . 'config';
+            \$sql = \"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '\" . \$tbl . \"'\";
+            \$stmt = \$pdo->query(\$sql);
             echo \$stmt->fetchColumn() > 0 ? 'yes' : 'no';
         } catch (Exception \$e) {
             echo 'no';
