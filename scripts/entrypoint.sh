@@ -197,8 +197,7 @@ install_or_upgrade() {
             --adminemail="${MOODLE_ADMIN_EMAIL}" \
             --fullname="${MOODLE_SITE_NAME}" \
             --shortname="moodle" \
-            --agree-license \
-            --non-interactive
+            --agree-license
         log_ok "Moodle instalado correctamente."
     else
         # ── Upgrade (si hay versión más nueva en los archivos) ───────────────
