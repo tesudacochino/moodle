@@ -101,7 +101,6 @@ jobs:
           tags: |
             type=raw,value=${{ steps.version.outputs.raw }}
             type=raw,value=${{ steps.version.outputs.semver }}
-            type=raw,value=latest
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
