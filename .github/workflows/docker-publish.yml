@@ -27,7 +27,7 @@ name: Docker Build and Publish
 on:
   push:
     branches:
-      - main
+      - moodle-5.0
     paths:
       - 'Dockerfile'
       - 'MOODLE_VERSION'
@@ -122,7 +122,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MOODLE_VERSION=${{ steps.version.outputs.raw }}
-            PHP_VERSION=8.1
+            PHP_VERSION=8.2
           # Caché nativa de GitHub Actions (más simple y fiable que local)
           cache-from: type=gha
           cache-to: type=gha,mode=max
