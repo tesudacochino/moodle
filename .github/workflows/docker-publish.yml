@@ -27,7 +27,7 @@ name: Docker Build and Publish
 on:
   push:
     branches:
-      - main
+      - moodle-4.5
     paths:
       - 'Dockerfile'
       - 'MOODLE_VERSION'
