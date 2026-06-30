@@ -124,7 +124,10 @@ RUN apt-get update \
 # NO usar 'crontab' con este archivo — crontab no acepta el campo de usuario.
 RUN printf '* * * * * www-data /usr/local/bin/php /var/www/html/admin/cli/cron.php >> /var/log/moodle-cron.log 2>&1\n' \
     > /etc/cron.d/moodle-cron \
-    && chmod 0644 /etc/cron.d/moodle-cron
+    && chmod 0644 /etc/cron.d/moodle-cron \
+    && touch /var/log/moodle-cron.log \
+    && chown www-data:www-data /var/log/moodle-cron.log \
+    && chmod 0660 /var/log/moodle-cron.log
 
 EXPOSE 80
 

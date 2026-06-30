@@ -239,6 +239,8 @@ setup_permissions() {
 
 start_cron() {
     log "Iniciando cron de Moodle..."
+    # Exportar variables de entorno críticas del contenedor para el demonio cron
+    printenv | grep -E '^(DB_|MOODLE_|REDIS_|SMTP_|PATH|PHP_)' > /etc/environment || true
     service cron start || log_warn "No se pudo iniciar cron (puede no estar disponible)."
 }
 
