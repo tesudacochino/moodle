@@ -152,6 +152,24 @@ $CFG->pathtophp    = '/usr/local/bin/php';
 $CFG->pathtodu     = '/usr/bin/du';
 $CFG->aspellpath   = '/usr/bin/aspell';
 
+// ─── Configuración de Correo SMTP ─────────────────────────────────────────────
+$smtp_hosts = getenv('SMTP_HOSTS');
+if (!empty($smtp_hosts)) {
+    $CFG->smtphosts = $smtp_hosts;
+    $CFG->smtpuser  = getenv('SMTP_USER') ?: '';
+    $CFG->smtppass  = getenv('SMTP_PASS') ?: '';
+    $CFG->smtpsecure = getenv('SMTP_SECURE') ?: '';
+    $CFG->smtpauthtype = getenv('SMTP_AUTHTYPE') ?: 'LOGIN';
+}
+$noreply_address = getenv('SMTP_NOREPLY_ADDRESS');
+if (!empty($noreply_address)) {
+    $CFG->noreplyaddress = $noreply_address;
+}
+$support_email = getenv('SMTP_SUPPORT_EMAIL');
+if (!empty($support_email)) {
+    $CFG->supportemail = $support_email;
+}
+
 // ─── Debug (desactivar en producción) ────────────────────────────────────────
 // $CFG->debug        = E_ALL;
 // $CFG->debugdisplay = 1;

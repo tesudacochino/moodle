@@ -58,6 +58,14 @@ services:
       # Redis cache
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Correo SMTP
+      SMTP_HOSTS:           ${SMTP_HOSTS:-}
+      SMTP_USER:            ${SMTP_USER:-}
+      SMTP_PASS:            ${SMTP_PASS:-}
+      SMTP_SECURE:          ${SMTP_SECURE:-}
+      SMTP_AUTHTYPE:        ${SMTP_AUTHTYPE:-}
+      SMTP_NOREPLY_ADDRESS: ${SMTP_NOREPLY_ADDRESS:-}
+      SMTP_SUPPORT_EMAIL:   ${SMTP_SUPPORT_EMAIL:-}
     volumes:
       # moodledata SIEMPRE en volumen — nunca borrar este volumen
       - moodledata:/var/www/moodledata
