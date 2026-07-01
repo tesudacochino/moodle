@@ -12,13 +12,13 @@
 #                         Crear en: hub.docker.com → Account Settings → Security
 #
 # Tags generados automáticamente desde el archivo MOODLE_VERSION:
-#   MOODLE_405_STABLE  →  tesudacochino/moodle:MOODLE_405_STABLE
-#                         tesudacochino/moodle:4.5
+#   MOODLE_500_STABLE  →  tesudacochino/moodle:MOODLE_500_STABLE
+#                         tesudacochino/moodle:5.0
 #                         tesudacochino/moodle:latest
 #                         tesudacochino/moodle:sha-<commit>
 #
 # Para actualizar Moodle:
-#   1. Editar MOODLE_VERSION (ej: MOODLE_406_STABLE)
+#   1. Editar MOODLE_VERSION (ej: MOODLE_501_STABLE)
 #   2. git commit + push → CI construye y publica automáticamente
 # =============================================================================
 
@@ -62,7 +62,7 @@ jobs:
           VERSION=$(cat MOODLE_VERSION | tr -d '[:space:]')
           echo "raw=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          # Convertir MOODLE_405_STABLE → 4.5
+          # Convertir MOODLE_500_STABLE → 5.0
           DIGITS=$(echo "$VERSION" | grep -oP '(?<=MOODLE_)\d+(?=_STABLE)' || echo "")
           if [ -n "$DIGITS" ]; then
             MAJOR=$(echo "$DIGITS" | cut -c1)
@@ -105,7 +105,7 @@ jobs:
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
-            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.4 + Apache + PostgreSQL + Redis
+            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.2 + Apache + PostgreSQL + Redis
             org.opencontainers.image.vendor=${{ secrets.DOCKERHUB_USERNAME }}
             moodle.version=${{ steps.version.outputs.raw }}
 
@@ -148,4 +148,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/moodle
           readme-filepath: ./README.md
-          short-description: "Moodle LMS con PHP 8.4, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"
+          short-description: "Moodle LMS con PHP 8.2, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"

@@ -19,7 +19,7 @@ FROM moodlehq/moodle-php-apache:${PHP_VERSION}
 #   MOODLE_404_STABLE → Moodle 4.4.x
 #   MOODLE_403_STABLE → Moodle 4.3.x
 # ---------------------------------------------------------------------------
-ARG MOODLE_VERSION=MOODLE_405_STABLE
+ARG MOODLE_VERSION=MOODLE_500_STABLE
 ARG MOODLE_REPO=https://github.com/moodle/moodle.git
 
 # Metadata de la imagen
