@@ -29,8 +29,8 @@ services:
     # Imagen desde Docker Hub — cambia MOODLE_IMAGE_TAG en .env para pinear versión
     # Ejemplos:
     #   tesudacochino/moodle:latest              → siempre el más reciente
-    #   tesudacochino/moodle:4.5                 → Moodle 4.5.x
-    #   tesudacochino/moodle:MOODLE_405_STABLE   → rama exacta
+    #   tesudacochino/moodle:5.2                 → Moodle 5.2.x
+    #   tesudacochino/moodle:MOODLE_502_STABLE   → rama exacta
     image: ${DOCKERHUB_USERNAME:-molero}/moodle:${MOODLE_IMAGE_TAG:-latest}
     container_name: moodle_app
     restart: always

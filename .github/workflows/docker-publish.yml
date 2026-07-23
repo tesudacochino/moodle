@@ -3,7 +3,10 @@
 # =============================================================================
 #
 # Triggers:
-#   • push a 'main' (solo si cambian archivos relevantes de la imagen)
+#   • push a 'moodle-5.2' (solo si cambian archivos relevantes de la imagen)
+#   • schedule semanal → reconstruye contra el HEAD actual de MOODLE_502_STABLE,
+#     así se recogen automáticamente los futuros parches de la serie 5.2.x
+#     (5.2.1, 5.2.2...) sin necesidad de tocar este repo
 #   • workflow_dispatch → ejecución manual desde GitHub UI
 #
 # Secretos requeridos (GitHub → Settings → Secrets → Actions):
@@ -12,14 +15,17 @@
 #                         Crear en: hub.docker.com → Account Settings → Security
 #
 # Tags generados automáticamente desde el archivo MOODLE_VERSION:
-#   MOODLE_500_STABLE  →  tesudacochino/moodle:MOODLE_500_STABLE
-#                         tesudacochino/moodle:5.0
+#   MOODLE_502_STABLE  →  tesudacochino/moodle:MOODLE_502_STABLE
+#                         tesudacochino/moodle:5.2
 #                         tesudacochino/moodle:latest
 #                         tesudacochino/moodle:sha-<commit>
 #
-# Para actualizar Moodle:
-#   1. Editar MOODLE_VERSION (ej: MOODLE_501_STABLE)
-#   2. git commit + push → CI construye y publica automáticamente
+# Para actualizar Moodle (dentro de la serie 5.2.x):
+#   1. La rama MOODLE_502_STABLE ya incluye los futuros parches (5.2.1, 5.2.2...)
+#      — basta con re-ejecutar este workflow (push o workflow_dispatch) para
+#      reconstruir con el último commit de la rama.
+#   2. Para saltar a otra serie (ej: 5.3): editar MOODLE_VERSION (MOODLE_503_STABLE)
+#      y git commit + push → CI construye y publica automáticamente
 # =============================================================================
 
 name: Docker Build and Publish
@@ -27,13 +33,16 @@ name: Docker Build and Publish
 on:
   push:
     branches:
-      - moodle-5.0
+      - moodle-5.2
     paths:
       - 'Dockerfile'
       - 'MOODLE_VERSION'
       - 'scripts/**'
       - 'config/**'
       - '.github/workflows/docker-publish.yml'
+  schedule:
+    # Todos los lunes a las 03:00 UTC — recoge parches nuevos de MOODLE_502_STABLE
+    - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -62,7 +71,7 @@ jobs:
           VERSION=$(cat MOODLE_VERSION | tr -d '[:space:]')
           echo "raw=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          # Convertir MOODLE_500_STABLE → 5.0
+          # Convertir MOODLE_502_STABLE → 5.2
           DIGITS=$(echo "$VERSION" | grep -oP '(?<=MOODLE_)\d+(?=_STABLE)' || echo "")
           if [ -n "$DIGITS" ]; then
             MAJOR=$(echo "$DIGITS" | cut -c1)
@@ -75,6 +84,17 @@ jobs:
 
           echo "semver=${SEMVER}" >> "$GITHUB_OUTPUT"
           echo "Moodle version: ${VERSION} → semver: ${SEMVER}"
+
+      # ── 2b. SHA del HEAD actual de la rama upstream ─────────────────────────
+      #     Se usa como build-arg para invalidar la caché de Docker en cada
+      #     rebuild programado — sin esto, un build cacheado nunca recogería
+      #     los parches nuevos que Moodle publique en la rama STABLE.
+      - name: Resolve upstream commit SHA
+        id: upstream
+        run: |
+          SHA=$(git ls-remote https://github.com/moodle/moodle.git "refs/heads/${{ steps.version.outputs.raw }}" | cut -f1)
+          echo "sha=${SHA:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "Upstream HEAD de ${{ steps.version.outputs.raw }}: ${SHA:-unknown}"
 
       # ── 3. QEMU para builds multi-arquitectura ───────────────────────────────
       - name: Setup QEMU
@@ -105,7 +125,7 @@ jobs:
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
-            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.2 + Apache + PostgreSQL + Redis
+            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.3 + Apache + PostgreSQL + Redis
             org.opencontainers.image.vendor=${{ secrets.DOCKERHUB_USERNAME }}
             moodle.version=${{ steps.version.outputs.raw }}
 
@@ -122,7 +142,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MOODLE_VERSION=${{ steps.version.outputs.raw }}
-            PHP_VERSION=8.2
+            MOODLE_COMMIT_SHA=${{ steps.upstream.outputs.sha }}
+            PHP_VERSION=8.3
           # Caché nativa de GitHub Actions (más simple y fiable que local)
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -148,4 +169,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/moodle
           readme-filepath: ./README.md
-          short-description: "Moodle LMS con PHP 8.2, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"
+          short-description: "Moodle LMS con PHP 8.3, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"

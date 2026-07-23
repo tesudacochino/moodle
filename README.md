@@ -1,16 +1,20 @@
-# 🎓 Moodle Docker — Imagen personalizada y mantenible (Moodle 5.0)
+# 🎓 Moodle Docker — Imagen personalizada y mantenible (Moodle 5.2)
 
 [![Docker Build](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml)
 [![Docker Hub](https://img.shields.io/docker/v/tesudacochino/moodle?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/tesudacochino/moodle)
 
-Stack Docker completo para Moodle LMS basado en `moodlehq/moodle-php-apache:8.2`,
+Stack Docker completo para Moodle LMS basado en `moodlehq/moodle-php-apache:8.3`,
 con código de Moodle descargado directamente desde GitHub en tiempo de build.
+
+Esta rama (`moodle-5.2`) sigue `MOODLE_502_STABLE` — un job programado semanalmente
+en CI reconstruye la imagen contra el HEAD actual de esa rama, así que recoge los
+futuros parches de la serie 5.2.x (5.2.1, 5.2.2...) automáticamente, sin tocar este repo.
 
 ## Servicios
 
 | Servicio | Imagen | Puerto |
 |---|---|---|
-| **Moodle** (PHP 8.2 + Apache) | `tesudacochino/moodle:<version>` | `8080` |
+| **Moodle** (PHP 8.3 + Apache) | `tesudacochino/moodle:<version>` | `8080` |
 | **PostgreSQL 17** | `postgres:17-alpine` | interno |
 | **Redis 7** | `redis:7-alpine` | interno |
 
@@ -67,7 +71,7 @@ make info          # Info del entorno
 ### Método 1 — Script interactivo (recomendado)
 
 ```bash
-./scripts/update-moodle.sh MOODLE_500_STABLE
+./scripts/update-moodle.sh MOODLE_502_STABLE
 ```
 
 El script hace backup automático, actualiza la versión, rebuilda y ejecuta la migración de BD.
@@ -79,7 +83,7 @@ El script hace backup automático, actualiza la versión, rebuilda y ejecuta la 
 make backup
 
 # 2. Cambiar versión en .env
-# Edita .env y cambia MOODLE_VERSION=MOODLE_500_STABLE
+# Edita .env y cambia MOODLE_VERSION=MOODLE_502_STABLE
 
 # 3. Rebuild de la imagen (descarga la nueva versión de GitHub)
 make rebuild
@@ -92,10 +96,10 @@ make upgrade
 
 | Rama Git | Versión Moodle | Soporte |
 |---|---|---|
-| `MOODLE_500_STABLE` | 5.0.x | ✅ Última versión |
+| `MOODLE_502_STABLE` | 5.2.x | ✅ Última versión (requiere PHP >= 8.3) |
+| `MOODLE_500_STABLE` | 5.0.x | Activa |
 | `MOODLE_405_STABLE` | 4.5.x | LTS ✅ Recomendada |
 | `MOODLE_404_STABLE` | 4.4.x | Activa |
-| `MOODLE_403_STABLE` | 4.3.x | Solo seguridad |
 
 ---
 
@@ -111,8 +115,8 @@ make upgrade   # Para registrar los nuevos plugins en la BD
 Formato de `plugins.txt`:
 ```
 # tipo/nombre   url_repositorio   rama
-mod/attendance  https://github.com/danmarsden/moodle-mod_attendance   MOODLE_500_STABLE
-theme/moove     https://github.com/willianmano/moodle-theme-moove      MOODLE_500_STABLE
+mod/attendance  https://github.com/danmarsden/moodle-mod_attendance   MOODLE_502_STABLE
+theme/moove     https://github.com/willianmano/moodle-theme-moove      MOODLE_502_STABLE
 ```
 
 ---
@@ -123,7 +127,7 @@ theme/moove     https://github.com/willianmano/moodle-theme-moove      MOODLE_50
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `MOODLE_VERSION` | `MOODLE_500_STABLE` | Rama de Moodle a usar |
+| `MOODLE_VERSION` | `MOODLE_502_STABLE` | Rama de Moodle a usar |
 | `MOODLE_WWWROOT` | `http://localhost:8080` | URL pública de Moodle |
 | `MOODLE_ADMIN_USER` | `admin` | Usuario administrador |
 | `MOODLE_ADMIN_PASS` | `Admin1234!` | Contraseña admin |
@@ -135,7 +139,7 @@ theme/moove     https://github.com/willianmano/moodle-theme-moove      MOODLE_50
 
 ### 📧 Configuración de Correo (SMTP)
 
-Moodle 5.0 en este stack permite configurar el correo directamente desde variables de entorno. Descomenta y ajusta en tu `.env`:
+Moodle 5.2 en este stack permite configurar el correo directamente desde variables de entorno. Descomenta y ajusta en tu `.env`:
 
 - `SMTP_HOSTS`: Servidor SMTP (ej: `smtp.gmail.com:587`)
 - `SMTP_USER`: Usuario (ej: `tu-correo@gmail.com`)
