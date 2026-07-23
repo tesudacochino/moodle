@@ -176,6 +176,14 @@ Los backups se guardan en `./backups/` con timestamp:
 
 ## 🐛 Troubleshooting
 
+**"The Moodle root directory must not be publicly accessible" (Moodle 5.1+)**
+Desde Moodle 5.1, el código web-accesible vive en `/public` dentro del checkout —
+`DocumentRoot` debe apuntar ahí, no a la raíz. Ya está corregido en
+`config/apache/moodle.conf` en esta rama (`moodle-5.2` en adelante). Si creas una
+nueva rama de imagen para una serie ≥5.1, verifica que ese archivo siga apuntando a
+`/var/www/html/public` — las ramas de series anteriores (4.5, 5.0) no tienen ese
+directorio y deben mantener `DocumentRoot /var/www/html`.
+
 **El cron no envía correos**
 Verifica que las variables `SMTP_*` en el `.env` son correctas y reinicia el stack:
 ```bash
