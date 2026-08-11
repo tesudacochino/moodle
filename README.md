@@ -6,9 +6,12 @@
 Stack Docker completo para Moodle LMS basado en `moodlehq/moodle-php-apache:8.3`,
 con código de Moodle descargado directamente desde GitHub en tiempo de build.
 
-Esta rama (`moodle-5.2`) sigue `MOODLE_502_STABLE` — un job programado semanalmente
-en CI reconstruye la imagen contra el HEAD actual de esa rama, así que recoge los
-futuros parches de la serie 5.2.x (5.2.1, 5.2.2...) automáticamente, sin tocar este repo.
+Esta rama (`moodle-5.2`) sigue `MOODLE_502_STABLE`, así que en teoría ya incluye los
+futuros parches de la serie 5.2.x (5.2.1, 5.2.2...) — pero **la recogida no es
+automática**. Cuando Moodle publique un nuevo parche, lanza el workflow a mano
+desde GitHub Actions ("Docker Build and Publish" → *Run workflow*), o haz push
+de cualquier cambio a esta rama; el build siempre usa el HEAD actual de
+`MOODLE_502_STABLE` en ese momento.
 
 ## Servicios
 

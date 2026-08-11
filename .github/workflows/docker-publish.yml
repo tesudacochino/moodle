@@ -9,8 +9,10 @@
 # NOTA: NO hay trigger 'schedule' aquí a propósito. GitHub Actions solo evalúa
 # 'schedule:' si el workflow vive en la rama por defecto del repo (main) — en
 # una rama de versión como esta, un cron aquí nunca se ejecutaría (letra
-# muerta). El rebuild automático semanal está centralizado en
-# .github/workflows/scheduled-rebuild.yml, en 'main'.
+# muerta, así estuvo semanas sin avisar). Decisión: en lugar de meter
+# automatización en 'main' (que se reserva solo para releases LTS), los
+# parches de la serie 5.2.x (5.2.1, 5.2.2...) se recogen a mano — ver el
+# punto 1 más abajo.
 #
 # Secretos requeridos (GitHub → Settings → Secrets → Actions):
 #   DOCKERHUB_USERNAME  → usuario de Docker Hub (ej: tesudacochino)
@@ -24,9 +26,12 @@
 #                         tesudacochino/moodle:sha-<commit>
 #
 # Para actualizar Moodle (dentro de la serie 5.2.x):
-#   1. La rama MOODLE_502_STABLE ya incluye los futuros parches (5.2.1, 5.2.2...)
-#      — el rebuild programado semanal en scheduled-rebuild.yml (main) lo
-#      recoge solo. Para forzarlo ya: workflow_dispatch aquí o en ese workflow.
+#   1. La rama MOODLE_502_STABLE ya incluye los futuros parches (5.2.1, 5.2.2...),
+#      pero NO hay nada automático que los recoja. Cuando os llegue el aviso de
+#      un nuevo parche: lanzad este workflow a mano desde GitHub UI
+#      (Actions → Docker Build and Publish → Run workflow), o haced push de
+#      cualquier cambio a esta rama — el build siempre usa el HEAD actual de
+#      MOODLE_502_STABLE en ese momento (build-arg MOODLE_COMMIT_SHA).
 #   2. Para saltar a otra serie (ej: 5.3): editar MOODLE_VERSION (MOODLE_503_STABLE)
 #      y git commit + push → CI construye y publica automáticamente
 # =============================================================================
