@@ -23,9 +23,9 @@ services:
       dockerfile: Dockerfile
       args:
         # La versión se lee del .env → fácil de cambiar para upgrades
-        MOODLE_VERSION: ${MOODLE_VERSION:-MOODLE_50_STABLE}
-        PHP_VERSION: ${PHP_VERSION:-8.2}
-    image: moodle-custom:${MOODLE_VERSION:-MOODLE_50_STABLE}
+        MOODLE_VERSION: ${MOODLE_VERSION:-MOODLE_502_STABLE}
+        PHP_VERSION: ${PHP_VERSION:-8.3}
+    image: moodle-custom:${MOODLE_VERSION:-MOODLE_502_STABLE}
     container_name: moodle_app
     restart: unless-stopped
     depends_on:
@@ -58,6 +58,14 @@ services:
       # Redis cache
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Correo SMTP
+      SMTP_HOSTS:           ${SMTP_HOSTS:-}
+      SMTP_USER:            ${SMTP_USER:-}
+      SMTP_PASS:            ${SMTP_PASS:-}
+      SMTP_SECURE:          ${SMTP_SECURE:-}
+      SMTP_AUTHTYPE:        ${SMTP_AUTHTYPE:-}
+      SMTP_NOREPLY_ADDRESS: ${SMTP_NOREPLY_ADDRESS:-}
+      SMTP_SUPPORT_EMAIL:   ${SMTP_SUPPORT_EMAIL:-}
     volumes:
       # moodledata SIEMPRE en volumen — nunca borrar este volumen
       - moodledata:/var/www/moodledata

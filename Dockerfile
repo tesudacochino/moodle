@@ -8,19 +8,24 @@
 #   make rebuild
 # =============================================================================
 
-ARG PHP_VERSION=8.2
+ARG PHP_VERSION=8.3
 FROM moodlehq/moodle-php-apache:${PHP_VERSION}
 
 # ---------------------------------------------------------------------------
 # Build arguments — pueden sobreescribirse en docker-compose o en línea
 # ---------------------------------------------------------------------------
 # Rama estable de Moodle. Opciones:
-#   MOODLE_405_STABLE → Moodle 4.5.x (LTS recomendado)
-#   MOODLE_404_STABLE → Moodle 4.4.x
-#   MOODLE_403_STABLE → Moodle 4.3.x
+#   MOODLE_502_STABLE → Moodle 5.2.x (recomendado — requiere PHP >= 8.3)
+#   MOODLE_500_STABLE → Moodle 5.0.x
+#   MOODLE_405_STABLE → Moodle 4.5.x (LTS)
 # ---------------------------------------------------------------------------
-ARG MOODLE_VERSION=MOODLE_405_STABLE
+ARG MOODLE_VERSION=MOODLE_502_STABLE
 ARG MOODLE_REPO=https://github.com/moodle/moodle.git
+# SHA del commit HEAD de la rama en el momento del build. No se usa para nada
+# más que invalidar la caché de Docker cuando hay un parche nuevo en la rama
+# upstream (ej. rebuilds programados) — si no cambia, la capa de git clone
+# se serviría desde caché y el build ignoraría los nuevos commits.
+ARG MOODLE_COMMIT_SHA=""
 
 # Metadata de la imagen
 LABEL org.opencontainers.image.title="Moodle LMS"
@@ -60,6 +65,8 @@ ENV MOODLE_VERSION_LABEL=${MOODLE_VERSION}
 WORKDIR /
 
 RUN set -eux; \
+    # (no-op — solo referenciado para invalidar la caché de esta capa en cada commit nuevo)
+    echo "Moodle commit objetivo: ${MOODLE_COMMIT_SHA:-desconocido}"; \
     # Limpiar el directorio destino (la imagen base puede tener archivos)
     rm -rf /var/www/html; \
     mkdir -p /var/www/html; \
@@ -124,7 +131,10 @@ RUN apt-get update \
 # NO usar 'crontab' con este archivo — crontab no acepta el campo de usuario.
 RUN printf '* * * * * www-data /usr/local/bin/php /var/www/html/admin/cli/cron.php >> /var/log/moodle-cron.log 2>&1\n' \
     > /etc/cron.d/moodle-cron \
-    && chmod 0644 /etc/cron.d/moodle-cron
+    && chmod 0644 /etc/cron.d/moodle-cron \
+    && touch /var/log/moodle-cron.log \
+    && chown www-data:www-data /var/log/moodle-cron.log \
+    && chmod 0660 /var/log/moodle-cron.log
 
 EXPOSE 80
 

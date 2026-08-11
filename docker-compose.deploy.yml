@@ -29,8 +29,8 @@ services:
     # Imagen desde Docker Hub — cambia MOODLE_IMAGE_TAG en .env para pinear versión
     # Ejemplos:
     #   tesudacochino/moodle:latest              → siempre el más reciente
-    #   tesudacochino/moodle:4.5                 → Moodle 4.5.x
-    #   tesudacochino/moodle:MOODLE_405_STABLE   → rama exacta
+    #   tesudacochino/moodle:5.2                 → Moodle 5.2.x
+    #   tesudacochino/moodle:MOODLE_502_STABLE   → rama exacta
     image: ${DOCKERHUB_USERNAME:-molero}/moodle:${MOODLE_IMAGE_TAG:-latest}
     container_name: moodle_app
     restart: always
@@ -59,6 +59,14 @@ services:
       DB_PREFIX:  ${DB_PREFIX:-mdl_}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Correo SMTP
+      SMTP_HOSTS:           ${SMTP_HOSTS:-}
+      SMTP_USER:            ${SMTP_USER:-}
+      SMTP_PASS:            ${SMTP_PASS:-}
+      SMTP_SECURE:          ${SMTP_SECURE:-}
+      SMTP_AUTHTYPE:        ${SMTP_AUTHTYPE:-}
+      SMTP_NOREPLY_ADDRESS: ${SMTP_NOREPLY_ADDRESS:-}
+      SMTP_SUPPORT_EMAIL:   ${SMTP_SUPPORT_EMAIL:-}
     volumes:
       - moodledata:/var/www/moodledata
     networks:

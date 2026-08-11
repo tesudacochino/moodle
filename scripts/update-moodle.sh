@@ -6,8 +6,9 @@
 #   ./scripts/update-moodle.sh [nueva_version]
 #
 # Ejemplos:
+#   ./scripts/update-moodle.sh MOODLE_502_STABLE
+#   ./scripts/update-moodle.sh MOODLE_500_STABLE
 #   ./scripts/update-moodle.sh MOODLE_405_STABLE
-#   ./scripts/update-moodle.sh MOODLE_404_STABLE
 #
 # Este script:
 #   1. Muestra la versión actual
@@ -44,9 +45,9 @@ if [ -z "${NEW_VERSION}" ]; then
     log "Versión actual: ${CURRENT_VERSION}"
     echo ""
     echo "  Ramas disponibles (ejemplos):"
+    echo "    MOODLE_502_STABLE  → Moodle 5.2.x (Última)"
+    echo "    MOODLE_500_STABLE  → Moodle 5.0.x"
     echo "    MOODLE_405_STABLE  → Moodle 4.5.x (LTS)"
-    echo "    MOODLE_404_STABLE  → Moodle 4.4.x"
-    echo "    MOODLE_403_STABLE  → Moodle 4.3.x"
     echo ""
     read -rp "  Nueva versión: " NEW_VERSION
 fi
