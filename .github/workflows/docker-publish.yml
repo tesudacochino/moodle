@@ -3,16 +3,16 @@
 # =============================================================================
 #
 # Triggers:
-#   • push a 'moodle-5.2' (solo si cambian archivos relevantes de la imagen)
+#   • push a 'main' o 'moodle-5.2' (solo si cambian archivos relevantes de la imagen)
+#   • schedule semanal → reconstruye contra el HEAD actual de la rama Moodle
+#     indicada en MOODLE_VERSION, recogiendo parches (5.2.1, 5.2.2...) solo
 #   • workflow_dispatch → ejecución manual desde GitHub UI
 #
-# NOTA: NO hay trigger 'schedule' aquí a propósito. GitHub Actions solo evalúa
-# 'schedule:' si el workflow vive en la rama por defecto del repo (main) — en
-# una rama de versión como esta, un cron aquí nunca se ejecutaría (letra
-# muerta, así estuvo semanas sin avisar). Decisión: en lugar de meter
-# automatización en 'main' (que se reserva solo para releases LTS), los
-# parches de la serie 5.2.x (5.2.1, 5.2.2...) se recogen a mano — ver el
-# punto 1 más abajo.
+# NOTA sobre 'schedule': GitHub Actions solo evalúa este trigger si el workflow
+# vive en la rama por defecto del repo (main) — por eso este cron SOLO funciona
+# porque este archivo está fusionado en main. Si algún día se vuelve a mover
+# solo a una rama de versión, el cron dejaría de dispararse silenciosamente
+# (ya nos pasó una vez: 0 ejecuciones programadas en 19 días sin avisar).
 #
 # Secretos requeridos (GitHub → Settings → Secrets → Actions):
 #   DOCKERHUB_USERNAME  → usuario de Docker Hub (ej: tesudacochino)
@@ -26,12 +26,8 @@
 #                         tesudacochino/moodle:sha-<commit>
 #
 # Para actualizar Moodle (dentro de la serie 5.2.x):
-#   1. La rama MOODLE_502_STABLE ya incluye los futuros parches (5.2.1, 5.2.2...),
-#      pero NO hay nada automático que los recoja. Cuando os llegue el aviso de
-#      un nuevo parche: lanzad este workflow a mano desde GitHub UI
-#      (Actions → Docker Build and Publish → Run workflow), o haced push de
-#      cualquier cambio a esta rama — el build siempre usa el HEAD actual de
-#      MOODLE_502_STABLE en ese momento (build-arg MOODLE_COMMIT_SHA).
+#   1. La rama MOODLE_502_STABLE ya incluye los futuros parches (5.2.1, 5.2.2...)
+#      — el cron semanal los recoge solo. Para forzarlo ya: workflow_dispatch.
 #   2. Para saltar a otra serie (ej: 5.3): editar MOODLE_VERSION (MOODLE_503_STABLE)
 #      y git commit + push → CI construye y publica automáticamente
 # =============================================================================
@@ -41,6 +37,7 @@ name: Docker Build and Publish
 on:
   push:
     branches:
+      - main
       - moodle-5.2
     paths:
       - 'Dockerfile'
@@ -48,6 +45,9 @@ on:
       - 'scripts/**'
       - 'config/**'
       - '.github/workflows/docker-publish.yml'
+  schedule:
+    # Todos los lunes a las 03:00 UTC — recoge parches nuevos de la rama Moodle activa
+    - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
       force_rebuild:
