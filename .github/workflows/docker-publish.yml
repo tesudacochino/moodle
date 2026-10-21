@@ -104,7 +104,7 @@ jobs:
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
-            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.4 + Apache + PostgreSQL + Redis
+            org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.3 + Apache + PostgreSQL + Redis
             org.opencontainers.image.vendor=${{ secrets.DOCKERHUB_USERNAME }}
             moodle.version=${{ steps.version.outputs.raw }}
 
@@ -121,7 +121,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MOODLE_VERSION=${{ steps.version.outputs.raw }}
-            PHP_VERSION=8.1
+            PHP_VERSION=8.3
           # Caché nativa de GitHub Actions (más simple y fiable que local)
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -147,4 +147,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/moodle
           readme-filepath: ./README.md
-          short-description: "Moodle LMS con PHP 8.4, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"
+          short-description: "Moodle LMS con PHP 8.3, Apache, PostgreSQL 17 y Redis - imagen mantenible y actualizable"

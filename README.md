@@ -3,14 +3,14 @@
 [![Docker Build](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml)
 [![Docker Hub](https://img.shields.io/docker/v/tesudacochino/moodle?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/tesudacochino/moodle)
 
-Stack Docker completo para Moodle LMS basado en `moodlehq/moodle-php-apache:8.4`,
+Stack Docker completo para Moodle LMS basado en `moodlehq/moodle-php-apache:8.3`,
 con código de Moodle descargado directamente desde GitHub en tiempo de build.
 
 ## Servicios
 
 | Servicio | Imagen | Puerto |
 |---|---|---|
-| **Moodle** (PHP 8.4 + Apache) | `tesudacochino/moodle:<version>` | `8080` |
+| **Moodle** (PHP 8.3 + Apache) | `tesudacochino/moodle:<version>` | `8080` |
 | **PostgreSQL 17** | `postgres:17-alpine` | interno |
 | **Redis 7** | `redis:7-alpine` | interno |
 

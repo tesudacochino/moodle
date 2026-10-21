@@ -1,14 +1,17 @@
 # =============================================================================
 # Moodle Docker — Imagen personalizada y mantenible
 # =============================================================================
-# Imagen base: moodlehq/moodle-php-apache:8.4
-#   → PHP 8.4 + Apache + todas las extensiones PHP requeridas por Moodle
+# Imagen base: moodlehq/moodle-php-apache:8.3
+#   → PHP 8.3 + Apache + todas las extensiones PHP requeridas por Moodle
+#   (subido desde 8.1 el 2026-10-21: PHP 8.1 es EOL desde nov. 2025 y no
+#   recibe parches de seguridad — ver aviso crítico en php.net del 2026-10-21.
+#   Moodle 4.5 soporta hasta PHP 8.3.)
 #
 # Para actualizar Moodle, cambia MOODLE_VERSION en .env y ejecuta:
 #   make rebuild
 # =============================================================================
 
-ARG PHP_VERSION=8.1
+ARG PHP_VERSION=8.3
 FROM moodlehq/moodle-php-apache:${PHP_VERSION}
 
 # ---------------------------------------------------------------------------
