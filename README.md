@@ -3,7 +3,8 @@
 [![Docker Build](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml)
 [![Docker Hub](https://img.shields.io/docker/v/tesudacochino/moodle?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/tesudacochino/moodle)
 
-Stack Docker completo para Moodle LMS basado en `moodlehq/moodle-php-apache:8.3`,
+Stack Docker completo para Moodle LMS basado en la imagen **oficial** `php:8.3-apache-bookworm`
+(no en `moodlehq/moodle-php-apache` — ver nota de seguridad más abajo),
 con código de Moodle descargado directamente desde GitHub en tiempo de build.
 
 Esta rama sigue `MOODLE_502_STABLE` — un cron semanal en CI (solo funciona porque
@@ -169,7 +170,11 @@ Los backups se guardan en `./backups/` con timestamp:
 
 ## 🔒 Notas de seguridad
 
-- `moodlehq/moodle-php-apache` está pensado para **desarrollo/staging**, no producción.
+- Esta imagen se construye directamente desde `php:8.3-apache-bookworm` (oficial),
+  **no** desde `moodlehq/moodle-php-apache` — esa imagen de moodlehq dice
+  explícitamente en su propio README "not intended for production" (trae
+  xdebug, xhprof, pcov, fixtures de test...) y además tardó varios días en
+  publicar el parche de un CVE crítico de PHP (CVSS 9.2, 2026-10-21/22).
 - Para producción, usa HTTPS (`MOODLE_SSLPROXY=true`) y contraseñas fuertes.
 - El archivo `config.php` se genera dinámicamente y hereda las variables del sistema.
 - El servicio `cron` inyecta las variables de entorno necesarias desde `/etc/environment`.
