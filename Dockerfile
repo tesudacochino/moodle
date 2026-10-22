@@ -1,18 +1,22 @@
 # =============================================================================
 # Moodle Docker — Imagen personalizada y mantenible
 # =============================================================================
-# Imagen base: moodlehq/moodle-php-apache:8.3
-#   → PHP 8.3 + Apache + todas las extensiones PHP requeridas por Moodle
-#   (subido desde 8.1 el 2026-10-21: PHP 8.1 es EOL desde nov. 2025 y no
-#   recibe parches de seguridad — ver aviso crítico en php.net del 2026-10-21.
-#   Moodle 4.5 soporta hasta PHP 8.3.)
+# Imagen base: php:8.3-apache-bookworm (imagen OFICIAL de Docker, no la de
+#   moodlehq/moodle-php-apache). moodlehq advierte explícitamente que su
+#   imagen "is not intended for production" (lleva xdebug, xhprof, pcov,
+#   fixtures de test...) y además tardó varios días en publicar el parche
+#   de un CVE crítico (CVE-2026-109618/109619, CVSS 9.2, 2026-10-21) — la
+#   imagen oficial de PHP reaccionó en ~8h. Por eso instalamos aquí mismo
+#   solo las extensiones que Moodle necesita de verdad, sin herramientas
+#   de debug (ver https://docs.moodle.org/405/en/PHP).
+#   (PHP subido de 8.1 a 8.3 el 2026-10-21: 8.1 es EOL desde nov. 2025.)
 #
 # Para actualizar Moodle, cambia MOODLE_VERSION en .env y ejecuta:
 #   make rebuild
 # =============================================================================
 
 ARG PHP_VERSION=8.3
-FROM moodlehq/moodle-php-apache:${PHP_VERSION}
+FROM php:${PHP_VERSION}-apache-bookworm
 
 # ---------------------------------------------------------------------------
 # Build arguments — pueden sobreescribirse en docker-compose o en línea
@@ -27,9 +31,40 @@ ARG MOODLE_REPO=https://github.com/moodle/moodle.git
 
 # Metadata de la imagen
 LABEL org.opencontainers.image.title="Moodle LMS"
-LABEL org.opencontainers.image.description="Moodle custom Docker image based on moodlehq/moodle-php-apache"
+LABEL org.opencontainers.image.description="Moodle custom Docker image based on the official php:apache image"
 LABEL org.opencontainers.image.source="https://github.com/moodle/moodle"
 LABEL moodle.version="${MOODLE_VERSION}"
+
+# ---------------------------------------------------------------------------
+# Extensiones PHP requeridas por Moodle (sin extras de desarrollo/debug)
+# ---------------------------------------------------------------------------
+# ctype, curl, dom, iconv, json, mbstring, pcre, simplexml, spl, xml, sodium,
+# tokenizer y opcache ya vienen activados en la imagen base php:*-apache.
+# Solo instalamos lo que falta de verdad. Stack de BD: solo PostgreSQL —
+# es lo único que usa este proyecto, no se instala mysqli/pdo_mysql.
+# pdo_pgsql: Moodle en sí usa el driver nativo pgsql, no PDO, pero
+# scripts/entrypoint.sh sí usa PDO (new PDO(...)) para comprobar que la BD
+# está arriba — probado en local, sin esto el entrypoint nunca arranca.
+# ghostscript/sassc: dependencias en tiempo de ejecución que Moodle invoca
+# (conversión de PDF, compilación de temas SCSS), no solo de build.
+RUN set -eux; \
+    BUILD_DEPS="libfreetype6-dev libjpeg62-turbo-dev libicu-dev libpq-dev libxslt1-dev libldap2-dev libzip-dev"; \
+    RUNTIME_DEPS="libfreetype6 libjpeg62-turbo libicu72 libpq5 libxslt1.1 libldap-2.5-0 libzip4 \
+        ghostscript sassc unzip zip gettext-base git cron"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends $BUILD_DEPS $RUNTIME_DEPS; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg; \
+    docker-php-ext-configure ldap; \
+    docker-php-ext-configure zip --with-zip; \
+    docker-php-ext-install -j"$(nproc)" gd intl pgsql pdo_pgsql zip soap xsl exif ldap opcache; \
+    pecl install redis apcu igbinary; \
+    docker-php-ext-enable redis apcu igbinary; \
+    echo 'apc.enable_cli = On' >> /usr/local/etc/php/conf.d/10-docker-php-ext-apcu.ini; \
+    pecl clear-cache; \
+    apt-get purge -y --auto-remove $BUILD_DEPS; \
+    apt-get autoremove -y; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* /tmp/pear
 
 # ---------------------------------------------------------------------------
 # Variables de entorno de runtime (pueden sobreescribirse con -e o en compose)
@@ -94,8 +129,19 @@ COPY config/php/custom.ini /usr/local/etc/php/conf.d/99-moodle-custom.ini
 # ---------------------------------------------------------------------------
 # Configuración Apache personalizada
 # ---------------------------------------------------------------------------
+# __DOCUMENT_ROOT__ se resuelve aquí mismo, en build time: si el checkout de
+# Moodle trae /public (Moodle >= 5.1) servimos desde ahí, si no (< 5.1,
+# como esta rama), servimos desde la raíz. Así no hace falta acordarse de
+# ajustarlo a mano en cada rama de versión nueva.
 COPY config/apache/moodle.conf /etc/apache2/sites-available/moodle.conf
-RUN a2dissite 000-default.conf 2>/dev/null || true; \
+RUN set -eux; \
+    if [ -d /var/www/html/public ]; then \
+        DOCROOT=/var/www/html/public; \
+    else \
+        DOCROOT=/var/www/html; \
+    fi; \
+    sed -i "s#__DOCUMENT_ROOT__#${DOCROOT}#g" /etc/apache2/sites-available/moodle.conf; \
+    a2dissite 000-default.conf 2>/dev/null || true; \
     a2ensite moodle.conf; \
     a2enmod rewrite headers expires
 
@@ -106,20 +152,6 @@ COPY scripts/entrypoint.sh /usr/local/bin/moodle-entrypoint.sh
 RUN chmod +x /usr/local/bin/moodle-entrypoint.sh
 
 # ---------------------------------------------------------------------------
-# Extensiones PHP + dependencias del sistema (una sola capa de apt-get)
-# ---------------------------------------------------------------------------
-# pdo_pgsql: puede no estar activa en la imagen base, la instalamos explícitamente
-# cron: para tareas programadas de Moodle (cada minuto)
-# gettext-base: utilidades de localización
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libpq-dev \
-        cron \
-        gettext-base \
-    && docker-php-ext-install pdo_pgsql pgsql \
-    && rm -rf /var/lib/apt/lists/*
-
-# ---------------------------------------------------------------------------
 # Cron para tareas programadas de Moodle
 # ---------------------------------------------------------------------------
 # Formato /etc/cron.d: minuto hora dia mes diasemana USUARIO comando
@@ -127,7 +159,10 @@ RUN apt-get update \
 # NO usar 'crontab' con este archivo — crontab no acepta el campo de usuario.
 RUN printf '* * * * * www-data /usr/local/bin/php /var/www/html/admin/cli/cron.php >> /var/log/moodle-cron.log 2>&1\n' \
     > /etc/cron.d/moodle-cron \
-    && chmod 0644 /etc/cron.d/moodle-cron
+    && chmod 0644 /etc/cron.d/moodle-cron \
+    && touch /var/log/moodle-cron.log \
+    && chown www-data:www-data /var/log/moodle-cron.log \
+    && chmod 0660 /var/log/moodle-cron.log
 
 EXPOSE 80
 
