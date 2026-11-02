@@ -9,7 +9,7 @@ con código de Moodle descargado directamente desde GitHub en tiempo de build.
 
 Esta rama sigue `MOODLE_503_STABLE` — un cron semanal en CI (solo funciona porque
 este workflow vive en `main`, la rama por defecto; GitHub Actions ignora
-`schedule:` en cualquier otra rama) reconstruye CADA rama de versión (4.5, 5.0, 5.2, 5.3) contra su HEAD actual
+`schedule:` en cualquier otra rama) reconstruye CADA rama de versión con soporte (5.2, 5.3) contra su HEAD actual
 upstream, así que los futuros parches de cada serie (5.3.1, 5.2.5...) se
 publican solos, sin tocar este repo.
 

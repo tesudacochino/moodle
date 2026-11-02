@@ -8,7 +8,7 @@
 #     con el MOODLE_VERSION de esa rama.
 #   • schedule semanal (lunes 03:00 UTC) → construye CADA rama de la matriz
 #     (BRANCHES en el job 'prepare'), cada una con su propio MOODLE_VERSION,
-#     recogiendo parches nuevos (5.3.x, 5.2.x, 5.0.x, 4.5.x).
+#     recogiendo parches nuevos (5.3.x, 5.2.x). 4.5 y 5.0 ya sin soporte.
 #   • workflow_dispatch → manual desde GitHub UI: construye la rama elegida en
 #     "Use workflow from". Con 'all_branches' = true construye todas, como el cron.
 #
@@ -80,7 +80,7 @@ jobs:
       - name: Compute branch matrix
         id: set
         run: |
-          BRANCHES='["moodle-4.5","moodle-5.0","moodle-5.2","moodle-5.3"]'
+          BRANCHES='["moodle-5.2","moodle-5.3"]'
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.all_branches }}" = "true" ]; then
             echo "branches=${BRANCHES}" >> "$GITHUB_OUTPUT"
           else
