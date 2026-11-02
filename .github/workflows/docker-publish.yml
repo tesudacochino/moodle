@@ -3,10 +3,14 @@
 # =============================================================================
 #
 # Triggers:
-#   • push a 'main', 'moodle-5.2' o 'moodle-5.3' (solo si cambian archivos relevantes de la imagen)
-#   • schedule semanal → reconstruye contra el HEAD actual de la rama Moodle
-#     indicada en MOODLE_VERSION, recogiendo parches (5.2.1, 5.2.2...) solo
-#   • workflow_dispatch → ejecución manual desde GitHub UI
+#   • push a 'main', 'moodle-5.2' o 'moodle-5.3' (solo si cambian archivos
+#     relevantes de la imagen) → construye SOLO la rama que recibió el push,
+#     con el MOODLE_VERSION de esa rama.
+#   • schedule semanal (lunes 03:00 UTC) → construye CADA rama de la matriz
+#     (BRANCHES en el job 'prepare'), cada una con su propio MOODLE_VERSION,
+#     recogiendo parches nuevos (5.3.x, 5.2.x, 5.0.x, 4.5.x).
+#   • workflow_dispatch → manual desde GitHub UI: construye la rama elegida en
+#     "Use workflow from". Con 'all_branches' = true construye todas, como el cron.
 #
 # NOTA sobre 'schedule': GitHub Actions solo evalúa este trigger si el workflow
 # vive en la rama por defecto del repo (main) — por eso este cron SOLO funciona
@@ -25,10 +29,11 @@
 #                         tesudacochino/moodle:latest   (solo si es MOODLE_503_STABLE)
 #                         tesudacochino/moodle:sha-<commit>
 #
-# Para actualizar Moodle (dentro de la serie 5.2.x):
-#   1. La rama MOODLE_502_STABLE ya incluye los futuros parches (5.2.1, 5.2.2...)
+# Para actualizar Moodle (dentro de una serie):
+#   1. Cada rama MOODLE_xxx_STABLE ya incluye sus futuros parches (5.3.1, 5.2.5...)
 #      — el cron semanal los recoge solo. Para forzarlo ya: workflow_dispatch.
-#   2. Para saltar a otra serie (ej: 5.3): editar MOODLE_VERSION (MOODLE_503_STABLE)
+#   2. Para saltar a otra serie: crear rama moodle-X.Y, editar su MOODLE_VERSION y
+#      añadirla a BRANCHES en el job prepare
 #      y git commit + push → CI construye y publica automáticamente
 # =============================================================================
 
@@ -56,19 +61,50 @@ on:
         required: false
         default: 'false'
         type: boolean
+      all_branches:
+        description: 'Construir todas las ramas de la matriz (como el cron)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Job principal: build multi-arch y push a Docker Hub
+  # Decide qué ramas se construyen
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Select branches
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.set.outputs.branches }}
+    steps:
+      - name: Compute branch matrix
+        id: set
+        run: |
+          BRANCHES='["moodle-4.5","moodle-5.0","moodle-5.2","moodle-5.3"]'
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.all_branches }}" = "true" ]; then
+            echo "branches=${BRANCHES}" >> "$GITHUB_OUTPUT"
+          else
+            echo "branches=[\"${GITHUB_REF_NAME}\"]" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job principal: build multi-arch y push a Docker Hub (uno por rama)
   # ---------------------------------------------------------------------------
   build-and-push:
-    name: Build & Push to Docker Hub
+    name: Build & Push (${{ matrix.branch }})
+    needs: prepare
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJSON(needs.prepare.outputs.branches) }}
 
     steps:
-      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      # ── 1. Checkout de la rama a construir ──────────────────────────────────
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
 
       # ── 2. Leer versión desde MOODLE_VERSION ────────────────────────────────
       - name: Read Moodle version
@@ -151,8 +187,8 @@ jobs:
             MOODLE_COMMIT_SHA=${{ steps.upstream.outputs.sha }}
             PHP_VERSION=8.3
           # Caché nativa de GitHub Actions (más simple y fiable que local)
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.branch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.branch }}
           provenance: true
           sbom: true
 

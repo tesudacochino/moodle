@@ -1,4 +1,4 @@
-# 🎓 Moodle Docker — Imagen personalizada y mantenible (Moodle 5.2)
+# 🎓 Moodle Docker — Imagen personalizada y mantenible (Moodle 5.3)
 
 [![Docker Build](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/tesudacochino/moodle/actions/workflows/docker-publish.yml)
 [![Docker Hub](https://img.shields.io/docker/v/tesudacochino/moodle?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/tesudacochino/moodle)
@@ -7,10 +7,10 @@ Stack Docker completo para Moodle LMS basado en la imagen **oficial** `php:8.3-a
 (no en `moodlehq/moodle-php-apache` — ver nota de seguridad más abajo),
 con código de Moodle descargado directamente desde GitHub en tiempo de build.
 
-Esta rama sigue `MOODLE_502_STABLE` — un cron semanal en CI (solo funciona porque
+Esta rama sigue `MOODLE_503_STABLE` — un cron semanal en CI (solo funciona porque
 este workflow vive en `main`, la rama por defecto; GitHub Actions ignora
-`schedule:` en cualquier otra rama) reconstruye la imagen contra el HEAD actual
-de esa rama, así que los futuros parches de la serie 5.2.x (5.2.1, 5.2.2...) se
+`schedule:` en cualquier otra rama) reconstruye CADA rama de versión (4.5, 5.0, 5.2, 5.3) contra su HEAD actual
+upstream, así que los futuros parches de cada serie (5.3.1, 5.2.5...) se
 publican solos, sin tocar este repo.
 
 ## Servicios
@@ -74,7 +74,7 @@ make info          # Info del entorno
 ### Método 1 — Script interactivo (recomendado)
 
 ```bash
-./scripts/update-moodle.sh MOODLE_502_STABLE
+./scripts/update-moodle.sh MOODLE_503_STABLE
 ```
 
 El script hace backup automático, actualiza la versión, rebuilda y ejecuta la migración de BD.
@@ -86,7 +86,7 @@ El script hace backup automático, actualiza la versión, rebuilda y ejecuta la 
 make backup
 
 # 2. Cambiar versión en .env
-# Edita .env y cambia MOODLE_VERSION=MOODLE_502_STABLE
+# Edita .env y cambia MOODLE_VERSION=MOODLE_503_STABLE
 
 # 3. Rebuild de la imagen (descarga la nueva versión de GitHub)
 make rebuild
@@ -99,7 +99,8 @@ make upgrade
 
 | Rama Git | Versión Moodle | Soporte |
 |---|---|---|
-| `MOODLE_502_STABLE` | 5.2.x | ✅ Última versión (requiere PHP >= 8.3) |
+| `MOODLE_503_STABLE` | 5.3.x | ✅ Última versión (requiere PHP >= 8.3) — tag `latest` |
+| `MOODLE_502_STABLE` | 5.2.x | Activa |
 | `MOODLE_500_STABLE` | 5.0.x | Activa |
 | `MOODLE_405_STABLE` | 4.5.x | LTS ✅ Recomendada |
 | `MOODLE_404_STABLE` | 4.4.x | Activa |
@@ -130,7 +131,7 @@ theme/moove     https://github.com/willianmano/moodle-theme-moove      MOODLE_50
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `MOODLE_VERSION` | `MOODLE_502_STABLE` | Rama de Moodle a usar |
+| `MOODLE_VERSION` | `MOODLE_503_STABLE` | Rama de Moodle a usar |
 | `MOODLE_WWWROOT` | `http://localhost:8080` | URL pública de Moodle |
 | `MOODLE_ADMIN_USER` | `admin` | Usuario administrador |
 | `MOODLE_ADMIN_PASS` | `Admin1234!` | Contraseña admin |
