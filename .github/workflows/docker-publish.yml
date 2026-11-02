@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # Triggers:
-#   • push a 'main' o 'moodle-5.2' (solo si cambian archivos relevantes de la imagen)
+#   • push a 'main', 'moodle-5.2' o 'moodle-5.3' (solo si cambian archivos relevantes de la imagen)
 #   • schedule semanal → reconstruye contra el HEAD actual de la rama Moodle
 #     indicada en MOODLE_VERSION, recogiendo parches (5.2.1, 5.2.2...) solo
 #   • workflow_dispatch → ejecución manual desde GitHub UI
@@ -22,7 +22,7 @@
 # Tags generados automáticamente desde el archivo MOODLE_VERSION:
 #   MOODLE_502_STABLE  →  tesudacochino/moodle:MOODLE_502_STABLE
 #                         tesudacochino/moodle:5.2
-#                         tesudacochino/moodle:latest
+#                         tesudacochino/moodle:latest   (solo si es MOODLE_503_STABLE)
 #                         tesudacochino/moodle:sha-<commit>
 #
 # Para actualizar Moodle (dentro de la serie 5.2.x):
@@ -39,6 +39,7 @@ on:
     branches:
       - main
       - moodle-5.2
+      - moodle-5.3
     paths:
       - 'Dockerfile'
       - 'MOODLE_VERSION'
@@ -126,7 +127,7 @@ jobs:
           tags: |
             type=raw,value=${{ steps.version.outputs.raw }}
             type=raw,value=${{ steps.version.outputs.semver }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ steps.version.outputs.raw == 'MOODLE_503_STABLE' }}
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
