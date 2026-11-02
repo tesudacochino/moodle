@@ -27,7 +27,7 @@
 #   MOODLE_502_STABLE  →  tesudacochino/moodle:MOODLE_502_STABLE
 #                         tesudacochino/moodle:5.2
 #                         tesudacochino/moodle:latest   (solo si es MOODLE_503_STABLE)
-#                         tesudacochino/moodle:sha-<commit>
+#                         tesudacochino/moodle:5.2.4-20261030  (release real + build de Moodle)
 #
 # Para actualizar Moodle (dentro de una serie):
 #   1. Cada rama MOODLE_xxx_STABLE ya incluye sus futuros parches (5.3.1, 5.2.5...)
@@ -138,6 +138,23 @@ jobs:
           echo "sha=${SHA:-unknown}" >> "$GITHUB_OUTPUT"
           echo "Upstream HEAD de ${{ steps.version.outputs.raw }}: ${SHA:-unknown}"
 
+      # ── 2c. Versión real de Moodle (para etiquetar la imagen) ───────────────
+      #     Lee $release de public/version.php en el commit upstream que se va a
+      #     construir: '5.2.4+ (Build: 20261030)' → 5.2.4-20261030
+      #                '5.3+ (Build: 20261030)'   → 5.3-20261030
+      - name: Resolve Moodle release
+        id: release
+        run: |
+          LINE=$(curl -fsSL "https://raw.githubusercontent.com/moodle/moodle/${{ steps.upstream.outputs.sha }}/public/version.php" | grep -m1 '^\$release')
+          REL=$(echo "$LINE" | sed -E "s/.*'([0-9]+(\.[0-9]+)+)\+? \(Build: ([0-9]+)\)'.*/\1-\3/")
+          if ! echo "$REL" | grep -qE '^[0-9]+(\.[0-9]+)+-[0-9]{8}$'; then
+            echo "No se pudo interpretar la versión de Moodle: ${LINE}" >&2
+            exit 1
+          fi
+          echo "tag=${REL}" >> "$GITHUB_OUTPUT"
+          echo "repo_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Moodle release tag: ${REL}"
+
       # ── 3. QEMU para builds multi-arquitectura ───────────────────────────────
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
@@ -164,12 +181,15 @@ jobs:
             type=raw,value=${{ steps.version.outputs.raw }}
             type=raw,value=${{ steps.version.outputs.semver }}
             type=raw,value=latest,enable=${{ steps.version.outputs.raw == 'MOODLE_503_STABLE' }}
-            type=sha,prefix=sha-,format=short
+            type=raw,value=${{ steps.release.outputs.tag }}
           labels: |
             org.opencontainers.image.title=Moodle LMS
             org.opencontainers.image.description=Moodle ${{ steps.version.outputs.semver }} - PHP 8.3 + Apache + PostgreSQL + Redis
             org.opencontainers.image.vendor=${{ secrets.DOCKERHUB_USERNAME }}
             moodle.version=${{ steps.version.outputs.raw }}
+            moodle.release=${{ steps.release.outputs.tag }}
+            moodle.upstream-commit=${{ steps.upstream.outputs.sha }}
+            org.opencontainers.image.revision=${{ steps.release.outputs.repo_sha }}
 
       # ── 7. Build multi-arch y Push ───────────────────────────────────────────
       #    Una sola build para amd64 + arm64 → crea un manifest multi-plataforma
