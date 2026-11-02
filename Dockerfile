@@ -21,11 +21,12 @@ FROM php:${PHP_VERSION}-apache-bookworm
 # Build arguments — pueden sobreescribirse en docker-compose o en línea
 # ---------------------------------------------------------------------------
 # Rama estable de Moodle. Opciones:
-#   MOODLE_502_STABLE → Moodle 5.2.x (recomendado — requiere PHP >= 8.3)
+#   MOODLE_503_STABLE → Moodle 5.3.x (recomendado — requiere PHP >= 8.3)
+#   MOODLE_502_STABLE → Moodle 5.2.x
 #   MOODLE_500_STABLE → Moodle 5.0.x
 #   MOODLE_405_STABLE → Moodle 4.5.x (LTS)
 # ---------------------------------------------------------------------------
-ARG MOODLE_VERSION=MOODLE_502_STABLE
+ARG MOODLE_VERSION=MOODLE_503_STABLE
 ARG MOODLE_REPO=https://github.com/moodle/moodle.git
 # SHA del commit HEAD de la rama en el momento del build. No se usa para nada
 # más que invalidar la caché de Docker cuando hay un parche nuevo en la rama
