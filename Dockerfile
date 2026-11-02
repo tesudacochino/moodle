@@ -55,14 +55,17 @@ LABEL moodle.version="${MOODLE_VERSION}"
 RUN set -eux; \
     BUILD_DEPS="libfreetype6-dev libjpeg62-turbo-dev libicu-dev libpq-dev libxslt1-dev libldap2-dev libzip-dev"; \
     RUNTIME_DEPS="libfreetype6 libjpeg62-turbo libicu72 libpq5 libxslt1.1 libldap-2.5-0 libzip4 \
-        ghostscript sassc unzip zip gettext-base git cron"; \
+        ghostscript sassc unzip zip gettext-base git cron locales"; \
     apt-get update; \
     apt-get install -y --no-install-recommends $BUILD_DEPS $RUNTIME_DEPS; \
+    sed -i -E 's/^# *(en_US\.UTF-8 UTF-8|es_ES\.UTF-8 UTF-8)/\1/' /etc/locale.gen; \
+    locale-gen; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
     docker-php-ext-configure ldap; \
     docker-php-ext-configure zip --with-zip; \
     docker-php-ext-install -j"$(nproc)" gd intl pgsql pdo_pgsql zip soap xsl exif ldap opcache; \
-    pecl install redis apcu igbinary; \
+    pecl install apcu igbinary; \
+    pecl install --configureoptions 'enable-redis-igbinary="yes"' redis; \
     docker-php-ext-enable redis apcu igbinary; \
     echo 'apc.enable_cli = On' >> /usr/local/etc/php/conf.d/10-docker-php-ext-apcu.ini; \
     pecl clear-cache; \
@@ -120,6 +123,23 @@ RUN set -eux; \
     # Permisos correctos para Apache
     chown -R www-data:www-data /var/www/html; \
     chmod -R 755 /var/www/html
+
+# ---------------------------------------------------------------------------
+# Dependencias de Composer
+# ---------------------------------------------------------------------------
+# El git de Moodle no trae vendor/: faltan paquetes que solo instala Composer
+# (p. ej. league/oauth2-server, symfony/console) y que usan el router y la API
+# REST v2. Sin esto /api/rest/v2/openapi.json acaba en error fatal (y el check
+# core_router de administración queda en ERROR). Composer se monta solo durante
+# este RUN, no queda en la imagen final.
+RUN --mount=type=bind,from=composer:2,source=/usr/bin/composer,target=/usr/local/bin/composer \
+    set -eux; \
+    cd /var/www/html; \
+    COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_CACHE_DIR=/tmp/composer-cache \
+        composer install --no-dev --classmap-authoritative --no-interaction --no-progress; \
+    rm -rf /tmp/composer-cache; \
+    chown -R www-data:www-data /var/www/html/vendor; \
+    chmod -R 755 /var/www/html/vendor
 
 # ---------------------------------------------------------------------------
 # Directorio de datos de Moodle (moodledata) — siempre fuera del webroot

@@ -8,8 +8,9 @@
 #   2. Detecta si es primera instalación → instala la base de datos
 #   3. Detecta si hay upgrade pendiente → ejecuta upgrade
 #   4. Configura permisos de moodledata
-#   5. Arranca cron en background
-#   6. Pasa control al CMD original (apache2-foreground)
+#   5. Instala el paquete de idioma si MOODLE_LANG no es "en"
+#   6. Arranca cron en background
+#   7. Pasa control al CMD original (apache2-foreground)
 #
 # =============================================================================
 set -euo pipefail
@@ -131,6 +132,12 @@ $CFG->admin     = 'admin';
 // Sin esto, Moodle genera URLs http:// aunque el usuario acceda por https://
 $CFG->sslproxy = (getenv('MOODLE_SSLPROXY') === 'true');
 
+// ─── Router ───────────────────────────────────────────────────────────────────
+// Apache (config/apache/moodle.conf) ya reenvía las rutas inexistentes a
+// /r.php, así que el servidor siempre está preparado. Moodle solo lee esto
+// desde config.php.
+$CFG->routerconfigured = true;
+
 // ─── Seguridad ────────────────────────────────────────────────────────────────
 $CFG->directorypermissions = 02777;
 
@@ -237,6 +244,40 @@ setup_permissions() {
     log_ok "Permisos configurados."
 }
 
+# Moodle solo trae el inglés; cualquier otro idioma necesita su paquete en
+# moodledata/lang/. Se descarga una vez (si falta) para MOODLE_LANG != en.
+install_langpack() {
+    [ "${MOODLE_LANG}" = "en" ] && return 0
+
+    local lang_dir="${MOODLE_DATAROOT}/lang/${MOODLE_LANG}"
+    if [ -f "${lang_dir}/langconfig.php" ]; then
+        log_ok "Paquete de idioma '${MOODLE_LANG}' ya instalado."
+        return 0
+    fi
+
+    # MOODLE_503_STABLE → 5.3 (los paquetes se publican por versión mayor.menor)
+    local branch="${MOODLE_VERSION_LABEL:-}"
+    if [[ ! "${branch}" =~ ^MOODLE_([0-9])([0-9]{2})_STABLE$ ]]; then
+        log_warn "No se pudo deducir la versión de Moodle de '${branch}'; omito el paquete de idioma '${MOODLE_LANG}'."
+        return 0
+    fi
+    local version="${BASH_REMATCH[1]}.$((10#${BASH_REMATCH[2]}))"
+    local url="https://download.moodle.org/download.php/direct/langpack/${version}/${MOODLE_LANG}.zip"
+
+    log "Descargando paquete de idioma '${MOODLE_LANG}' (${version})..."
+    local tmp
+    tmp="$(mktemp -d)"
+    if curl -fsSL --retry 3 -o "${tmp}/lang.zip" "${url}" \
+        && mkdir -p "${MOODLE_DATAROOT}/lang" \
+        && unzip -q -o "${tmp}/lang.zip" -d "${MOODLE_DATAROOT}/lang"; then
+        chown -R www-data:www-data "${MOODLE_DATAROOT}/lang"
+        log_ok "Paquete de idioma '${MOODLE_LANG}' instalado."
+    else
+        log_warn "No se pudo instalar el paquete de idioma '${MOODLE_LANG}' desde ${url} — Moodle usará inglés."
+    fi
+    rm -rf "${tmp}"
+}
+
 start_cron() {
     log "Iniciando cron de Moodle..."
     # Exportar variables de entorno críticas del contenedor para el demonio cron
@@ -256,6 +297,7 @@ log "======================================================"
 wait_for_db
 generate_config
 setup_permissions
+install_langpack
 install_or_upgrade
 start_cron
 

@@ -135,7 +135,7 @@ theme/moove     https://github.com/willianmano/moodle-theme-moove      MOODLE_50
 | `MOODLE_WWWROOT` | `http://localhost:8080` | URL pública de Moodle |
 | `MOODLE_ADMIN_USER` | `admin` | Usuario administrador |
 | `MOODLE_ADMIN_PASS` | `Admin1234!` | Contraseña admin |
-| `MOODLE_LANG` | `es` | Idioma por defecto |
+| `MOODLE_LANG` | `es` | Idioma por defecto (`es` o `en`). Solo se aplica en la primera instalación; si no es `en`, el entrypoint descarga su paquete de idioma. La imagen trae los locales `en_US.UTF-8` y `es_ES.UTF-8`; otros idiomas necesitan añadir su locale en el `Dockerfile` |
 | `DB_NAME` | `moodle` | Nombre de la BD |
 | `DB_USER` | `moodle` | Usuario de BD |
 | `DB_PASS` | `moodle` | Contraseña de BD |
