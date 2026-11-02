@@ -3,8 +3,20 @@
 # =============================================================================
 #
 # Triggers:
-#   • push a 'main' (solo si cambian archivos relevantes de la imagen)
-#   • workflow_dispatch → ejecución manual desde GitHub UI
+#   • push a 'main', 'moodle-5.2' o 'moodle-5.3' (solo si cambian archivos
+#     relevantes de la imagen) → construye SOLO la rama que recibió el push,
+#     con el MOODLE_VERSION de esa rama.
+#   • schedule semanal (lunes 03:00 UTC) → construye CADA rama de la matriz
+#     (BRANCHES en el job 'prepare'), cada una con su propio MOODLE_VERSION,
+#     recogiendo parches nuevos (5.3.x, 5.2.x, 5.0.x, 4.5.x).
+#   • workflow_dispatch → manual desde GitHub UI: construye la rama elegida en
+#     "Use workflow from". Con 'all_branches' = true construye todas, como el cron.
+#
+# NOTA sobre 'schedule': GitHub Actions solo evalúa este trigger si el workflow
+# vive en la rama por defecto del repo (main) — por eso este cron SOLO funciona
+# porque este archivo está fusionado en main. Si algún día se vuelve a mover
+# solo a una rama de versión, el cron dejaría de dispararse silenciosamente
+# (ya nos pasó una vez: 0 ejecuciones programadas en 19 días sin avisar).
 #
 # Secretos requeridos (GitHub → Settings → Secrets → Actions):
 #   DOCKERHUB_USERNAME  → usuario de Docker Hub (ej: tesudacochino)
@@ -12,14 +24,17 @@
 #                         Crear en: hub.docker.com → Account Settings → Security
 #
 # Tags generados automáticamente desde el archivo MOODLE_VERSION:
-#   MOODLE_405_STABLE  →  tesudacochino/moodle:MOODLE_405_STABLE
-#                         tesudacochino/moodle:4.5
-#                         tesudacochino/moodle:latest
+#   MOODLE_502_STABLE  →  tesudacochino/moodle:MOODLE_502_STABLE
+#                         tesudacochino/moodle:5.2
+#                         tesudacochino/moodle:latest   (solo si es MOODLE_503_STABLE)
 #                         tesudacochino/moodle:sha-<commit>
 #
-# Para actualizar Moodle:
-#   1. Editar MOODLE_VERSION (ej: MOODLE_406_STABLE)
-#   2. git commit + push → CI construye y publica automáticamente
+# Para actualizar Moodle (dentro de una serie):
+#   1. Cada rama MOODLE_xxx_STABLE ya incluye sus futuros parches (5.3.1, 5.2.5...)
+#      — el cron semanal los recoge solo. Para forzarlo ya: workflow_dispatch.
+#   2. Para saltar a otra serie: crear rama moodle-X.Y, editar su MOODLE_VERSION y
+#      añadirla a BRANCHES en el job prepare
+#      y git commit + push → CI construye y publica automáticamente
 # =============================================================================
 
 name: Docker Build and Publish
@@ -27,13 +42,18 @@ name: Docker Build and Publish
 on:
   push:
     branches:
-      - moodle-4.5
+      - main
+      - moodle-5.2
+      - moodle-5.3
     paths:
       - 'Dockerfile'
       - 'MOODLE_VERSION'
       - 'scripts/**'
       - 'config/**'
       - '.github/workflows/docker-publish.yml'
+  schedule:
+    # Todos los lunes a las 03:00 UTC — recoge parches nuevos de la rama Moodle activa
+    - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -41,19 +61,50 @@ on:
         required: false
         default: 'false'
         type: boolean
+      all_branches:
+        description: 'Construir todas las ramas de la matriz (como el cron)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Job principal: build multi-arch y push a Docker Hub
+  # Decide qué ramas se construyen
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Select branches
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.set.outputs.branches }}
+    steps:
+      - name: Compute branch matrix
+        id: set
+        run: |
+          BRANCHES='["moodle-4.5","moodle-5.0","moodle-5.2","moodle-5.3"]'
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.all_branches }}" = "true" ]; then
+            echo "branches=${BRANCHES}" >> "$GITHUB_OUTPUT"
+          else
+            echo "branches=[\"${GITHUB_REF_NAME}\"]" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job principal: build multi-arch y push a Docker Hub (uno por rama)
   # ---------------------------------------------------------------------------
   build-and-push:
-    name: Build & Push to Docker Hub
+    name: Build & Push (${{ matrix.branch }})
+    needs: prepare
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJSON(needs.prepare.outputs.branches) }}
 
     steps:
-      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      # ── 1. Checkout de la rama a construir ──────────────────────────────────
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
 
       # ── 2. Leer versión desde MOODLE_VERSION ────────────────────────────────
       - name: Read Moodle version
@@ -62,7 +113,7 @@ jobs:
           VERSION=$(cat MOODLE_VERSION | tr -d '[:space:]')
           echo "raw=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          # Convertir MOODLE_405_STABLE → 4.5
+          # Convertir MOODLE_502_STABLE → 5.2
           DIGITS=$(echo "$VERSION" | grep -oP '(?<=MOODLE_)\d+(?=_STABLE)' || echo "")
           if [ -n "$DIGITS" ]; then
             MAJOR=$(echo "$DIGITS" | cut -c1)
@@ -75,6 +126,17 @@ jobs:
 
           echo "semver=${SEMVER}" >> "$GITHUB_OUTPUT"
           echo "Moodle version: ${VERSION} → semver: ${SEMVER}"
+
+      # ── 2b. SHA del HEAD actual de la rama upstream ─────────────────────────
+      #     Se usa como build-arg para invalidar la caché de Docker en cada
+      #     rebuild programado — sin esto, un build cacheado nunca recogería
+      #     los parches nuevos que Moodle publique en la rama STABLE.
+      - name: Resolve upstream commit SHA
+        id: upstream
+        run: |
+          SHA=$(git ls-remote https://github.com/moodle/moodle.git "refs/heads/${{ steps.version.outputs.raw }}" | cut -f1)
+          echo "sha=${SHA:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "Upstream HEAD de ${{ steps.version.outputs.raw }}: ${SHA:-unknown}"
 
       # ── 3. QEMU para builds multi-arquitectura ───────────────────────────────
       - name: Setup QEMU
@@ -101,6 +163,7 @@ jobs:
           tags: |
             type=raw,value=${{ steps.version.outputs.raw }}
             type=raw,value=${{ steps.version.outputs.semver }}
+            type=raw,value=latest,enable=${{ steps.version.outputs.raw == 'MOODLE_503_STABLE' }}
             type=sha,prefix=sha-,format=short
           labels: |
             org.opencontainers.image.title=Moodle LMS
@@ -121,10 +184,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             MOODLE_VERSION=${{ steps.version.outputs.raw }}
+            MOODLE_COMMIT_SHA=${{ steps.upstream.outputs.sha }}
             PHP_VERSION=8.3
           # Caché nativa de GitHub Actions (más simple y fiable que local)
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.branch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.branch }}
           provenance: true
           sbom: true
 
